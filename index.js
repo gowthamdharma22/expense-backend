@@ -1,7 +1,6 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express, { json } from "express";
-
 import connectDB from "./src/config/db.js";
 import authRoutes from "./src/routes/auth.routes.js";
 import expenseRoutes from "./src/routes/expense.routes.js";
@@ -14,7 +13,7 @@ const app = express();
 app.use(cors());
 app.use(json());
 
-app.get("/", (_, res) => res.send("Hello from Expense Tracker API"));
+app.get("/api", (_, res) => res.send("Hello from Expense Tracker API"));
 app.use("/api/auth", authRoutes);
 app.use("/api/expense", protect, expenseRoutes);
 
