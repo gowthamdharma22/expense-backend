@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 
 const { Schema } = mongoose;
 
-const ROLES = ["admin", "user"];
+const ROLES = ["admin", "employee"];
 
 const userSchema = new Schema(
   {
@@ -21,7 +21,7 @@ const userSchema = new Schema(
     role: {
       type: String,
       enum: ROLES,
-      default: "user",
+      default: "employee",
     },
   },
   {
