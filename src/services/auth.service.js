@@ -14,7 +14,7 @@ const registerUser = async ({ email, password, role }) => {
   const user = new User({
     email,
     password,
-    role: role || "user",
+    role: role || "employee",
   });
 
   await user.save();
