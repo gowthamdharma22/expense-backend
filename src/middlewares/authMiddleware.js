@@ -51,7 +51,12 @@ const admin = (req, res, next) => {
     next();
   } else {
     logger.error("[authMiddleware.js] [admin] - Access denied for non-admin");
-    return sendError(res, { message: "Admins only" }, "Forbidden", 403);
+    return sendError(
+      res,
+      { message: "Admins only can access" },
+      "Forbidden",
+      403
+    );
   }
 };
 
