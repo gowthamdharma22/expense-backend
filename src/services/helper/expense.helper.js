@@ -27,16 +27,12 @@ const updateTemplateExpenseBridge = async (expenseId, data) => {
   });
 
   if (templateExpenseBridge) {
-    templateExpenseBridge.isDefault =
-      data.isDefault || templateExpenseBridge.isDefault;
-    templateExpenseBridge.templateId =
-      data.templateId || templateExpenseBridge.templateId;
+    if (typeof data.isDefault === "boolean") {
+      templateExpenseBridge.isDefault = data.isDefault;
+    }
 
-    if (data.isDefault) {
-      await TemplateExpenseBridge.updateMany(
-        { templateId: data.templateId, isDefault: true },
-        { isDefault: false }
-      );
+    if (data.templateId) {
+      templateExpenseBridge.templateId = data.templateId;
     }
 
     await templateExpenseBridge.save();
