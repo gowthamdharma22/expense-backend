@@ -9,6 +9,7 @@ const shopSchema = new Schema(
     name: { type: String, required: true },
     owner: { type: Schema.Types.ObjectId, ref: "User" },
     templateId: { type: Number, ref: "Template", required: true },
+    allowedEditDays: { type: Number, default: 2 },
   },
   { timestamps: true }
 );
