@@ -76,7 +76,7 @@ const getDayById = async (dayId) => {
   }
 };
 
-const getDayByDate = async (date, shopId) => {
+const getDayByDate = async (dateStr, shopId) => {
   try {
     const shop = await Shop.findOne({ id: shopId });
     if (!shop) {
@@ -87,26 +87,48 @@ const getDayByDate = async (date, shopId) => {
 
     const allowedEditDays = shop.allowedEditDays || 0;
     const today = dayjs().utc();
-    const targetDate = new Date(date);
 
-    const day = await Days.findOne({ date: targetDate, shopId });
-    if (!day) {
-      const error = new Error("Day not found");
-      error.status = 404;
-      throw error;
+    const parsedDate = dayjs(dateStr, ["YYYY-MM-DD", "YYYY-MM", "YYYY"], true);
+    if (!parsedDate.isValid()) {
+      throw new Error("Invalid date format. Use YYYY-MM-DD, YYYY-MM or YYYY");
     }
 
-    const diff = today.diff(targetDate, "day");
+    let startDate, endDate;
 
-    if (diff > allowedEditDays && !day.isFrozen) {
-      day.isFrozen = true;
-      await day.save();
-    } else if (day.isFrozen) {
-      day.isFrozen = false;
-      await day.save();
+    if (dateStr.length === 10) {
+      startDate = parsedDate.startOf("day");
+      endDate = parsedDate.endOf("day");
+    } else if (dateStr.length === 7) {
+      startDate = parsedDate.startOf("month");
+      endDate = parsedDate.endOf("month");
+    } else if (dateStr.length === 4) {
+      startDate = parsedDate.startOf("year");
+      endDate = parsedDate.endOf("year");
+    } else {
+      throw new Error("Unsupported date format");
     }
 
-    return day;
+    const days = await Days.find({
+      shopId,
+      date: {
+        $gte: startDate.toDate(),
+        $lte: endDate.toDate(),
+      },
+    });
+
+    for (const day of days) {
+      const diff = today.diff(dayjs(day.date).utc().startOf("day"), "day");
+
+      if (diff > allowedEditDays && !day.isFrozen) {
+        day.isFrozen = true;
+        await day.save();
+      } else if (day.isFrozen) {
+        day.isFrozen = false;
+        await day.save();
+      }
+    }
+
+    return days;
   } catch (err) {
     logger.error(`[day.service.js] [getDayByDate] - Error: ${err.message}`);
     throw new Error("Error fetching day by date: " + err.message);
