@@ -7,8 +7,7 @@ const templateSchema = new Schema(
   {
     id: { type: Number, unique: true },
     name: { type: String, required: true },
-    shopIds: [{ type: Number, ref: "Shop" }],
-    allowedEditDays: { type: Number, default: 2 },
+    shopIds: [{ type: Number, ref: "Shop" }]
   },
   { timestamps: true }
 );
