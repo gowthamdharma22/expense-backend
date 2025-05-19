@@ -1,10 +1,17 @@
 import logger from "../utils/logger.js";
 import * as DayService from "../services/day.service.js";
 import { sendSuccess, sendError } from "../utils/responseHandler.js";
+import * as Activity from "../services/activity.service.js";
 
 const createDay = async (req, res) => {
   try {
     const day = await DayService.createDay(req.body);
+
+    Activity.Logger(
+      { email: req.user?.email, role: req.user?.role },
+      `Created day (${day.date})`
+    );
+
     sendSuccess(res, day, "Day created successfully", 201);
   } catch (err) {
     logger.error(`[day.controller.js] [createDay] - ${err.message}`);
@@ -96,6 +103,15 @@ const updateDay = async (req, res) => {
         404
       );
     }
+
+    Activity.Logger(
+      {
+        email: req.user?.email,
+        role: req.user?.role,
+      },
+      `Updated day (${updatedDay.date})`
+    );
+
     sendSuccess(res, updatedDay, "Day updated successfully", 200);
   } catch (err) {
     logger.error(`[day.controller.js] [updateDay] - ${err.message}`);
@@ -119,6 +135,15 @@ const deleteDay = async (req, res) => {
         404
       );
     }
+
+    Activity.Logger(
+      {
+        email: req.user?.email,
+        role: req.user?.role,
+      },
+      `Deleted day (${deleted.date})`
+    );
+
     sendSuccess(
       res,
       { message: "Day deleted successfully" },
