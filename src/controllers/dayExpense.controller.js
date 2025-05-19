@@ -1,7 +1,8 @@
 import logger from "../utils/logger.js";
+import * as DayService from "../services/day.service.js";
+import * as Activity from "../services/activity.service.js";
 import { sendSuccess, sendError } from "../utils/responseHandler.js";
 import * as DayExpenseService from "../services/dayExpense.service.js";
-import * as DayService from "../services/day.service.js";
 
 const createDayExpense = async (req, res) => {
   try {
@@ -21,6 +22,12 @@ const createDayExpense = async (req, res) => {
     }
 
     const newDayExpense = await DayExpenseService.createDayExpense(req.body);
+
+    Activity.Logger(
+      { email: req.user?.email, role: req.user?.role },
+      `Created day expense for day (${dayData.date})`
+    );
+
     sendSuccess(res, newDayExpense, "DayExpense created successfully", 201);
   } catch (err) {
     logger.error(
@@ -62,6 +69,12 @@ const verifyDayExpense = async (req, res) => {
     }
 
     const result = await DayExpenseService.verifyDayExpense(id, status);
+
+    Activity.Logger(
+      { email: req.user?.email, role: req.user?.role },
+      `Marked day expense (${id}) as ${status ? "verified" : "unverified"}`
+    );
+
     res.status(200).json(result);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
@@ -131,6 +144,12 @@ const updateDayExpense = async (req, res) => {
     }
 
     const updated = await DayExpenseService.updateDayExpense(id, req.body);
+
+    Activity.Logger(
+      { email: req.user?.email, role: req.user?.role },
+      `Updated day expense (${id})`
+    );
+
     sendSuccess(res, updated, "DayExpense updated successfully", 200);
   } catch (err) {
     logger.error(
@@ -157,6 +176,12 @@ const deleteDayExpense = async (req, res) => {
         404
       );
     }
+
+    Activity.Logger(
+      { email: req.user?.email, role: req.user?.role },
+      `Deleted day expense (${id})`
+    );
+
     sendSuccess(
       res,
       { message: "DayExpense deleted successfully" },

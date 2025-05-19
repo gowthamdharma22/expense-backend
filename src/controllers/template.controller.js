@@ -1,10 +1,17 @@
+import logger from "../utils/logger.js";
+import * as Activity from "../services/activity.service.js";
 import * as templateService from "../services/template.service.js";
 import { sendSuccess, sendError } from "../utils/responseHandler.js";
-import logger from "../utils/logger.js";
 
 const createTemplate = async (req, res) => {
   try {
     const result = await templateService.createTemplate(req.body);
+
+    Activity.Logger(
+      { email: req.user?.email, role: req.user?.role },
+      `Created template (${result.name || "new"})`
+    );
+
     sendSuccess(res, result, "Template created successfully", 201);
   } catch (err) {
     logger.error(`[template.controller.js] [createTemplate] - ${err.message}`);
@@ -23,6 +30,12 @@ const updateTemplate = async (req, res) => {
       req.params.id,
       req.body
     );
+
+    Activity.Logger(
+      { email: req.user?.email, role: req.user?.role },
+      `Updated template (${result.name})`
+    );
+
     sendSuccess(res, result, "Template updated", 200);
   } catch (err) {
     logger.error(`[template.controller.js] [updateTemplate] - ${err.message}`);
@@ -38,6 +51,12 @@ const updateTemplate = async (req, res) => {
 const deleteTemplate = async (req, res) => {
   try {
     const result = await templateService.deleteTemplate(req.params.id);
+
+    Activity.Logger(
+      { email: req.user?.email, role: req.user?.role },
+      `Deleted template (${result.name})`
+    );
+
     sendSuccess(res, result, "Template deleted", 200);
   } catch (err) {
     logger.error(`[template.controller.js] [deleteTemplate] - ${err.message}`);

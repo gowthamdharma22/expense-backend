@@ -1,6 +1,7 @@
 import logger from "../utils/logger.js";
 import { sendSuccess, sendError } from "../utils/responseHandler.js";
 import * as shopService from "../services/shop.service.js";
+import * as Activity from "../services/activity.service.js";
 
 const createShopController = async (req, res) => {
   try {
@@ -8,6 +9,12 @@ const createShopController = async (req, res) => {
     const userId = req.user.id;
 
     const newShop = await shopService.createShop(name, userId, templateId);
+
+    Activity.Logger(
+      { email: req.user?.email, role: req.user?.role },
+      `Created shop (${newShop.name || "new"})`
+    );
+
     sendSuccess(res, "Shop created successfully", newShop, 201);
   } catch (err) {
     logger.error(
@@ -28,6 +35,12 @@ const updateShopController = async (req, res) => {
     const { shopId } = req.params;
     const data = req.body;
     const updatedShop = await shopService.updateShop(shopId, data);
+
+    Activity.Logger(
+      { email: req.user?.email, role: req.user?.role },
+      `Updated shop (${updatedShop.name})`
+    );
+
     sendSuccess(res, "Shop updated successfully", updatedShop, 200);
   } catch (err) {
     logger.error(
@@ -84,6 +97,12 @@ const deleteShopController = async (req, res) => {
   try {
     const { shopId } = req.params;
     const deletedShop = await shopService.deleteShop(shopId);
+
+    Activity.Logger(
+      { email: req.user?.email, role: req.user?.role },
+      `Deleted shop (${deletedShop.name})`
+    );
+
     sendSuccess(res, "Shop deleted successfully", deletedShop, 200);
   } catch (err) {
     logger.error(

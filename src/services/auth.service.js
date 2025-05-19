@@ -56,4 +56,14 @@ const loginUser = async ({ email, password }) => {
   };
 };
 
-export { registerUser, loginUser };
+const getAllUsers = async () => {
+  try {
+    const employees = await User.find({ role: "employee" }).select("-password");
+    return employees;
+  } catch (err) {
+    logger.error(`[auth.service.js] [getAllUsers] - ${err.message}`);
+    throw new Error("Failed to fetch employee users");
+  }
+};
+
+export { registerUser, loginUser, getAllUsers };

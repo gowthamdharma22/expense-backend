@@ -5,6 +5,7 @@ import connectDB from "./src/config/db.js";
 import dayRoutes from "./src/routes/day.routes.js";
 import shopRoutes from "./src/routes/shop.routes.js";
 import authRoutes from "./src/routes/auth.routes.js";
+import activityRoute from "./src/routes/activity.routes.js";
 import expenseRoutes from "./src/routes/expense.routes.js";
 import templateRoutes from "./src/routes/template.routes.js";
 import dayExpenseRoutes from "./src/routes/dayExpense.routes.js";
@@ -24,6 +25,7 @@ app.use("/api/template", protect, admin, templateRoutes);
 app.use("/api/shop", protect, admin, shopRoutes);
 app.use("/api/day", protect, dayRoutes);
 app.use("/api/day-expense", protect, dayExpenseRoutes);
+app.use("/api/activity", protect, activityRoute);
 
 const PORT = process.env.PORT || 5000;
 

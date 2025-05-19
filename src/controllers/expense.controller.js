@@ -1,6 +1,7 @@
 import logger from "../utils/logger.js";
 import { sendSuccess, sendError } from "../utils/responseHandler.js";
 import * as expenseService from "../services/expense.service.js";
+import * as Activity from "../services/activity.service.js";
 
 const getAllExpenses = async (req, res) => {
   try {
@@ -20,6 +21,12 @@ const getAllExpenses = async (req, res) => {
 const createNewExpense = async (req, res) => {
   try {
     const newExpense = await expenseService.createExpense(req.body);
+
+    Activity.Logger(
+      { email: req.user?.email, role: req.user?.role },
+      `Created expense (${newExpense.name || "new"})`
+    );
+
     sendSuccess(res, newExpense, "Expense created successfully", 201);
   } catch (err) {
     logger.error(`[expense.controller.js] [createNewExpense] - ${err.message}`);
@@ -69,6 +76,14 @@ const updateExpense = async (req, res) => {
         404
       );
     }
+
+    console.log(updatedExpense);
+
+    Activity.Logger(
+      { email: req.user?.email, role: req.user?.role },
+      `Updated expense (${updatedExpense.name})`
+    );
+
     sendSuccess(res, updatedExpense, "Expense updated successfully", 200);
   } catch (err) {
     logger.error(`[expense.controller.js] [updateExpense] - ${err.message}`);
@@ -92,6 +107,12 @@ const deleteExpense = async (req, res) => {
         404
       );
     }
+
+    Activity.Logger(
+      { email: req.user?.email, role: req.user?.role },
+      `Deleted expense (${deletedExpense.name})`
+    );
+
     sendSuccess(
       res,
       { message: "Expense deleted successfully" },
