@@ -2,7 +2,7 @@ import User from "../models/User.js";
 import { generateToken } from "../utils/generateToken.js";
 import logger from "../utils/logger.js";
 
-const registerUser = async ({ email, password, role }) => {
+const registerUser = async ({ email, name, password, role }) => {
   const userExists = await User.findOne({ email });
   if (userExists) {
     logger.error("[auth.service.js] [registerUser] - Email already exists");
@@ -13,6 +13,7 @@ const registerUser = async ({ email, password, role }) => {
 
   const user = new User({
     email,
+    name,
     password,
     role: role || "employee",
   });
@@ -66,4 +67,36 @@ const getAllUsers = async () => {
   }
 };
 
-export { registerUser, loginUser, getAllUsers };
+const updateUser = async (id, data) => {
+  try {
+    if (data.password) {
+      data.password = await bcrypt.hash(data.password, 10);
+    }
+
+    const updated = await User.findOneAndUpdate({ id: id }, data, {
+      new: true,
+    }).select("-password");
+    if (!updated) {
+      throw new Error("User not found");
+    }
+
+    return updated;
+  } catch (err) {
+    throw new Error(`Update failed: ${err.message}`);
+  }
+};
+
+const deleteUser = async (id) => {
+  try {
+    const deleted = await User.findOneAndDelete({ id: id }).select("-password");
+    if (!deleted) {
+      throw new Error("User not found");
+    }
+
+    return deleted;
+  } catch (err) {
+    throw new Error(`Delete failed: ${err.message}`);
+  }
+};
+
+export { registerUser, loginUser, getAllUsers, updateUser, deleteUser };

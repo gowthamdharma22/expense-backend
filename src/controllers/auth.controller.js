@@ -5,23 +5,18 @@ import * as Activity from "../services/activity.service.js";
 
 const register = async (req, res) => {
   try {
-    const { email, password, role } = req.body;
-    const requesterRole = req.user?.role;
+    let { email, name, password, role } = req.body;
 
     if (role === "employee") {
-      if (requesterRole !== "admin") {
-        return sendError(
-          res,
-          { message: "Only admin can create employee users" },
-          "Unauthorized",
-          403
-        );
-      } else {
-        password = "employee@2025";
-      }
+      password = "employee@2025";
     }
 
-    const result = await authService.registerUser({ email, password, role });
+    const result = await authService.registerUser({
+      email,
+      name,
+      password,
+      role,
+    });
 
     Activity.Logger({ email, role }, "User registered");
 
@@ -56,16 +51,6 @@ const login = async (req, res) => {
 
 const findAllUsers = async (req, res) => {
   try {
-    const requesterRole = req.user?.role;
-    if (requesterRole !== "admin") {
-      return sendError(
-        res,
-        { message: "Access denied: Admins only" },
-        "Unauthorized",
-        403
-      );
-    }
-
     const users = await authService.getAllUsers();
     sendSuccess(res, users, "Users fetched successfully", 200);
   } catch (err) {
@@ -74,4 +59,48 @@ const findAllUsers = async (req, res) => {
   }
 };
 
-export { register, login, findAllUsers };
+const updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updatedUser = await authService.updateUser(id, req.body);
+
+    Activity.Logger(
+      { email: req.body.email, role: req.body.role },
+      `Updated user (${updatedUser.email})`
+    );
+
+    sendSuccess(res, updatedUser, "User updated successfully", 200);
+  } catch (err) {
+    logger.error(`[auth.controller.js] [updateUser] - ${err.message}`);
+    sendError(
+      res,
+      { message: err.message },
+      "Update failed",
+      err.status || 500
+    );
+  }
+};
+
+const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedUser = await authService.deleteUser(id);
+
+    Activity.Logger(
+      { email: deletedUser.email, role: deletedUser.role },
+      `Deleted user (${deletedUser.email})`
+    );
+
+    sendSuccess(res, deletedUser, "User deleted successfully", 200);
+  } catch (err) {
+    logger.error(`[auth.controller.js] [deleteUser] - ${err.message}`);
+    sendError(
+      res,
+      { message: err.message },
+      "Delete failed",
+      err.status || 500
+    );
+  }
+};
+
+export { register, login, findAllUsers, updateUser, deleteUser };
