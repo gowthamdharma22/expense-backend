@@ -2,20 +2,46 @@ import logger from "../utils/logger.js";
 import { sendSuccess, sendError } from "../utils/responseHandler.js";
 import * as shopService from "../services/shop.service.js";
 import * as Activity from "../services/activity.service.js";
+import mongoose from "mongoose";
+
+const VALID_SHOP_TYPES = ["wholesale", "retail"];
 
 const createShopController = async (req, res) => {
   try {
-    const { name, templateId } = req.body;
-    const userId = req.user.id;
+    const { name, templateId, shopType } = req.body;
+    const userId = req.user?._id;
 
-    const newShop = await shopService.createShop(name, userId, templateId);
+    if (!name || !templateId || !shopType) {
+      return sendError(
+        res,
+        { message: "Missing required fields" },
+        "Validation Error",
+        400
+      );
+    }
+
+    if (!VALID_SHOP_TYPES.includes(shopType)) {
+      return sendError(
+        res,
+        { message: "Invalid shopType. Must be 'wholesale' or 'retail'" },
+        "Invalid Shop Type",
+        400
+      );
+    }
+
+    const newShop = await shopService.createShop(
+      name,
+      userId,
+      templateId,
+      shopType
+    );
 
     Activity.Logger(
       { email: req.user?.email, role: req.user?.role },
-      `Created shop (${newShop.name || "new"})`
+      `Created shop (${newShop.name || "new"}) with type (${shopType})`
     );
 
-    sendSuccess(res, "Shop created successfully", newShop, 201);
+    sendSuccess(res, newShop, "Shop created successfully", 201);
   } catch (err) {
     logger.error(
       "[shop.controller.js] [createShopController] - Error creating shop: " +
@@ -34,6 +60,16 @@ const updateShopController = async (req, res) => {
   try {
     const { shopId } = req.params;
     const data = req.body;
+
+    if (data.shopType && !VALID_SHOP_TYPES.includes(data.shopType)) {
+      return sendError(
+        res,
+        { message: "Invalid shopType. Must be 'wholesale' or 'retail'" },
+        "Invalid Shop Type",
+        400
+      );
+    }
+
     const updatedShop = await shopService.updateShop(shopId, data);
 
     Activity.Logger(
@@ -41,7 +77,7 @@ const updateShopController = async (req, res) => {
       `Updated shop (${updatedShop.name})`
     );
 
-    sendSuccess(res, "Shop updated successfully", updatedShop, 200);
+    sendSuccess(res, updatedShop, "Shop updated successfully", 200);
   } catch (err) {
     logger.error(
       "[shop.controller.js] [updateShopController] - Error updating shop: " +
@@ -59,7 +95,7 @@ const updateShopController = async (req, res) => {
 const getAllShopsController = async (req, res) => {
   try {
     const shops = await shopService.getAllShops();
-    sendSuccess(res, "Shops fetched successfully", shops, 200);
+    sendSuccess(res, shops, "Shops fetched successfully", 200);
   } catch (err) {
     logger.error(
       "[shop.controller.js] [getAllShopsController] - Error fetching shops: " +
@@ -78,7 +114,10 @@ const getShopByIdController = async (req, res) => {
   try {
     const { shopId } = req.params;
     const shop = await shopService.getShopById(shopId);
-    sendSuccess(res, "Shop fetched successfully", shop, 200);
+    if (!shop) {
+      return sendError(res, { message: "Shop not found" }, "Not Found", 404);
+    }
+    sendSuccess(res, shop, "Shop fetched successfully", 200);
   } catch (err) {
     logger.error(
       "[shop.controller.js] [getShopByIdController] - Error fetching shop by ID: " +
@@ -103,7 +142,7 @@ const deleteShopController = async (req, res) => {
       `Deleted shop (${deletedShop.name})`
     );
 
-    sendSuccess(res, "Shop deleted successfully", deletedShop, 200);
+    sendSuccess(res, deletedShop, "Shop deleted successfully", 200);
   } catch (err) {
     logger.error(
       "[shop.controller.js] [deleteShopController] - Error deleting shop: " +

@@ -13,6 +13,28 @@ const createTemplate = async (data) => {
     logger.info(
       `[template.service.js] [createTemplate] - Template created: ${saved.id}`
     );
+
+    // Add default expenses (id 1 and 2) to this template
+    const defaultExpenses = await Expense.find({ id: { $in: [1, 2] } }).lean();
+
+    if (defaultExpenses.length) {
+      for (const expense of defaultExpenses) {
+        const newBridge = new TemplateExpenseBridge({
+          templateId: saved.id,
+          expenseId: expense.id,
+        });
+        await newBridge.save();
+      }
+
+      logger.info(
+        `[template.service.js] [createTemplate] - Default expenses linked to template ${saved.id}`
+      );
+    } else {
+      logger.warn(
+        `[template.service.js] [createTemplate] - No default expenses found (id 1 & 2)`
+      );
+    }
+
     return saved;
   } catch (err) {
     logger.error(

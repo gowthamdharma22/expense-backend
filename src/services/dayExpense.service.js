@@ -3,6 +3,9 @@ import logger from "../utils/logger.js";
 import { cleanData } from "../utils/responseHandler.js";
 import Days from "../models/Day.js";
 import Expense from "../models/Expense.js";
+import * as TemplateService from "./template.service.js";
+import * as TransactionService from "./transaction.service.js";
+import Shop from "../models/Shop.js";
 
 const getAllDayExpenses = async () => {
   try {
@@ -61,11 +64,46 @@ const getDayExpenseById = async (id) => {
 
 const createDayExpense = async (data) => {
   try {
+    const { expenseId, templateId, amount, description } = data;
+
     const newDayExpense = new DayExpense(data);
+
+    const template = await TemplateService.getTemplateDetails(templateId);
+
+    if (!template || template.shopIds.length === 0) {
+      throw new Error("Template is not mapped with any shops");
+    }
+
     const saved = await newDayExpense.save();
+
+    if (expenseId === 1 || expenseId === 2) {
+      const type = expenseId === 1 ? "credit" : "debit";
+
+      for (const shopId of template.shopIds) {
+        const shop = await Shop.findOne({ id: shopId });
+
+        if (!shop) {
+          logger.warn(
+            `[createDayExpense] Shop with id ${shopId} not found while linking transaction`
+          );
+          continue;
+        }
+
+        await TransactionService.recordTransaction({
+          shopType: shop.shopType,
+          shopId: shop.id,
+          amount,
+          type,
+          description,
+          dayExpenseId: saved.id,
+        });
+      }
+    }
+
     logger.info(
       `[dayExpense.service.js] [createDayExpense] - Created: ${saved.id}`
     );
+
     return cleanData(saved.toObject());
   } catch (err) {
     logger.error(
@@ -77,6 +115,9 @@ const createDayExpense = async (data) => {
 
 const updateDayExpense = async (id, data) => {
   try {
+    if (id == 1 || 2) {
+      throw new Error("Default expenses cannot be updated");
+    }
     const updated = await DayExpense.findOneAndUpdate({ id }, data, {
       new: true,
     }).lean();

@@ -10,6 +10,7 @@ const shopSchema = new Schema(
     owner: { type: Schema.Types.ObjectId, ref: "User" },
     templateId: { type: Number, ref: "Template", required: true },
     allowedEditDays: { type: Number, default: 2 },
+    shopType: { type: String, enum: ["wholesale", "retail"], required: true },
   },
   { timestamps: true }
 );

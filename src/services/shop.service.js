@@ -3,13 +3,21 @@ import Expense from "../models/Expense.js";
 import Template from "../models/Template.js";
 import { cleanData } from "../utils/responseHandler.js";
 import TemplateExpenseBridge from "../models/TemplateExpenseBridge.js";
-import { deleteTemplate } from "./template.service.js";
 
-const createShop = async (name, userId, templateId) => {
+const VALID_SHOP_TYPES = ["wholesale", "retail"];
+
+const createShop = async (name, userId, templateId, shopType) => {
+  if (!VALID_SHOP_TYPES.includes(shopType)) {
+    const error = new Error("Invalid shopType. Must be 'wholesale' or 'retail'");
+    error.status = 400;
+    throw error;
+  }
+
   const newShop = new Shop({
     name,
     owner: userId,
     templateId,
+    shopType,
   });
 
   await newShop.save();
@@ -17,13 +25,20 @@ const createShop = async (name, userId, templateId) => {
   if (templateId) {
     await Template.updateOne(
       { id: templateId },
-      { $push: { shopIds: newShop.id } }
+      { $addToSet: { shopIds: newShop.id } } // ensure no duplicates
     );
   }
-  return newShop;
+
+  return cleanData(newShop.toObject());
 };
 
 const updateShop = async (shopId, data) => {
+  if (data.shopType && !VALID_SHOP_TYPES.includes(data.shopType)) {
+    const error = new Error("Invalid shopType. Must be 'wholesale' or 'retail'");
+    error.status = 400;
+    throw error;
+  }
+
   const updatedShop = await Shop.findOneAndUpdate(
     { id: shopId },
     { ...data },
@@ -35,7 +50,8 @@ const updateShop = async (shopId, data) => {
     error.status = 404;
     throw error;
   }
-  return updatedShop;
+
+  return cleanData(updatedShop.toObject());
 };
 
 const getAllShops = async () => {
@@ -99,14 +115,14 @@ const deleteShop = async (shopId) => {
     throw error;
   }
 
-  if (deleteShop.templateId) {
+  if (deletedShop.templateId) {
     await Template.updateOne(
-      { id: deleteShop.templateId },
-      { $pop: { shopIds: newShop.id } }
+      { id: deletedShop.templateId },
+      { $pull: { shopIds: deletedShop.id } }
     );
   }
 
-  return deletedShop;
+  return cleanData(deletedShop.toObject());
 };
 
 export { createShop, updateShop, getAllShops, getShopById, deleteShop };

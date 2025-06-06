@@ -23,4 +23,27 @@ expenseSchema.plugin(autoIncrement, {
   start_seq: 1,
 });
 
-export default model("Expense", expenseSchema);
+expenseSchema.statics.ensureDefaults = async function () {
+  const defaults = [
+    { name: "credit", description: "Default credit expense", type: "credit" },
+    { name: "debit", description: "Default debit expense", type: "debit" },
+  ];
+
+  for (const def of defaults) {
+    const exists = await this.findOne({ name: def.name });
+    if (!exists) {
+      await this.create(def);
+    }
+  }
+};
+
+const Expense = model("Expense", expenseSchema);
+
+Expense.ensureDefaults().catch((err) => {
+  console.error(
+    "[expense.model.js] Failed to create default expenses:",
+    err.message
+  );
+});
+
+export default Expense;

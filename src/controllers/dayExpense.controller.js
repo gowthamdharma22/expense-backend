@@ -25,7 +25,7 @@ const createDayExpense = async (req, res) => {
 
     Activity.Logger(
       { email: req.user?.email, role: req.user?.role },
-      `Created day expense for day (${dayData.date})`
+      `Created day expense for day (${day.date})`
     );
 
     sendSuccess(res, newDayExpense, "DayExpense created successfully", 201);
