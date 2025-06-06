@@ -5,7 +5,7 @@ const autoIncrement = mongooseSequence(mongoose);
 
 const daySchema = new Schema({
   id: { type: Number, unique: true },
-  date: { type: Date, required: true, unique: true },
+  date: { type: Date, required: true },
   isVerified: { type: Boolean, default: false },
   verifiedAt: { type: Date },
   isFrozen: { type: Boolean, default: false },

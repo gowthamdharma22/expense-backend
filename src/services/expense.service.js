@@ -106,20 +106,31 @@ const updateExpense = async (expenseId, data) => {
     }
 
     if (data.templateId || data.isDefault !== undefined) {
-      await updateTemplateExpenseBridge(expenseId, data);
+      const existingBridge = await TemplateExpenseBridge.findOne({
+        expenseId: expenseId,
+      });
+
+      if (!existingBridge && data.templateId) {
+        await createTemplateExpenseBridge(
+          expenseId,
+          data.templateId,
+          data.isDefault
+        );
+      } else {
+        await updateTemplateExpenseBridge(expenseId, data);
+      }
     }
 
     const updatedExpense = await Expense.findOneAndUpdate(
       { id: expenseId },
       data,
-      {
-        new: true,
-      }
+      { new: true }
     );
 
     logger.info(
       `[expense.service.js] [updateExpense] - Expense updated: ${updatedExpense.id}`
     );
+
     return updatedExpense;
   } catch (err) {
     logger.error(

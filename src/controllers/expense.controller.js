@@ -77,8 +77,6 @@ const updateExpense = async (req, res) => {
       );
     }
 
-    console.log(updatedExpense);
-
     Activity.Logger(
       { email: req.user?.email, role: req.user?.role },
       `Updated expense (${updatedExpense.name})`
