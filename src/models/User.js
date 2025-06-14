@@ -58,6 +58,28 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
+userSchema.statics.ensureDefaultAdmin = async function () {
+  const existing = await this.findOne({ email: "admin@xyz.com" });
+  if (!existing) {
+    const user = new this({
+      name: "Admin",
+      email: "admin@xyz.com",
+      password: "supersecure123",
+      role: "admin",
+    });
+    await user.save();
+    console.log("[user.model.js] Default Admin created.");
+  }
+};
+
 const User = mongoose.model("User", userSchema);
+
+// Auto-create default admin
+User.ensureDefaultAdmin().catch((err) => {
+  console.error(
+    "[user.model.js] Failed to create default super admin:",
+    err.message
+  );
+});
 
 export default User;

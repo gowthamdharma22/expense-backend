@@ -5,7 +5,9 @@ import Days from "../models/Day.js";
 import Expense from "../models/Expense.js";
 import * as TemplateService from "./template.service.js";
 import * as TransactionService from "./transaction.service.js";
+import * as DayService from "./day.service.js";
 import Shop from "../models/Shop.js";
+import dayjs from "dayjs";
 
 const getAllDayExpenses = async () => {
   try {
@@ -35,30 +37,77 @@ const getAllDayExpenses = async () => {
   }
 };
 
-const getDayExpenseById = async (id) => {
+const getDayExpenseByDate = async (dateStr, shopId) => {
   try {
-    const dayExpense = await DayExpense.findOne({ id }).lean();
-    if (!dayExpense) {
-      const error = new Error("DayExpense not found");
+    const parsedDate = dayjs(dateStr, "YYYY-MM-DD", true);
+    if (!parsedDate.isValid()) {
+      throw new Error("Invalid date format. Use YYYY-MM-DD");
+    }
+
+    const shop = await Shop.findOne({ id: shopId });
+    if (!shop) {
+      const error = new Error("Shop not found");
       error.status = 404;
       throw error;
     }
 
-    const [day, expense] = await Promise.all([
-      Days.findOne({ id: dayExpense.dayId }).lean(),
-      Expense.findOne({ id: dayExpense.expenseId }).lean(),
-    ]);
+    const startOfDay = parsedDate.startOf("day").toDate();
+    const endOfDay = parsedDate.endOf("day").toDate();
+
+    let dayEntry = await Days.findOne({
+      shopId,
+      date: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
+    }).lean();
+
+    if (!dayEntry) {
+      const createdDay = await DayService.createDay({
+        shopId,
+        date: dateStr,
+        templateId: shop.templateId,
+      });
+
+      dayEntry = createdDay.toObject?.() || createdDay;
+    }
+
+    const dayExpenses = await DayExpense.find({
+      dayId: dayEntry.id,
+    }).lean();
+
+    let totalAmount = 0;
+
+    const enrichedExpenses = await Promise.all(
+      dayExpenses.map(async (dayExpense) => {
+        const expense = await Expense.findOne({
+          id: dayExpense.expenseId,
+        }).lean();
+
+        const type = expense?.type;
+        if (type === "credit") {
+          totalAmount += dayExpense.amount || 0;
+        } else if (type === "debit") {
+          totalAmount -= dayExpense.amount || 0;
+        }
+
+        return {
+          ...cleanData(dayExpense),
+          expense: expense ? cleanData(expense) : null,
+        };
+      })
+    );
 
     return {
-      ...cleanData(dayExpense),
-      day: day ? cleanData(day) : null,
-      expense: expense ? cleanData(expense) : null,
+      day: cleanData(dayEntry),
+      expenses: enrichedExpenses,
+      totalAmount,
     };
   } catch (err) {
     logger.error(
-      `[dayExpense.service.js] [getDayExpenseById] - Error: ${err.message}`
+      `[dayExpense.service.js] [getDayExpenseByDate] - Error: ${err.message}`
     );
-    throw new Error("Error fetching day expense: " + err.message);
+    throw new Error("Error fetching day expense by date: " + err.message);
   }
 };
 
@@ -192,6 +241,6 @@ export {
   updateDayExpense,
   deleteDayExpense,
   getAllDayExpenses,
-  getDayExpenseById,
+  getDayExpenseByDate,
   verifyDayExpense,
 };
