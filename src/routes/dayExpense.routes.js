@@ -4,7 +4,7 @@ import * as dayExpenseController from "../controllers/dayExpense.controller.js";
 const router = express.Router();
 
 router.get("/", dayExpenseController.getAllDayExpenses);
-router.get("/:id", dayExpenseController.getDayExpenseById);
+router.get("/:date", dayExpenseController.getDayExpenseByDate);
 
 router.post("/", dayExpenseController.createDayExpense);
 router.put("/:id", dayExpenseController.updateDayExpense);

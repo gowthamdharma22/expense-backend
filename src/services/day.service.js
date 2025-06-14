@@ -3,6 +3,8 @@ import Days from "../models/Day.js";
 import logger from "../utils/logger.js";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js";
+import * as DayExpenseService from "./dayExpense.service.js";
+import TemplateExpenseBridge from "../models/TemplateExpenseBridge.js";
 dayjs.extend(utc);
 
 const getAllDays = async (shopId) => {
@@ -122,9 +124,6 @@ const getDayByDate = async (dateStr, shopId) => {
       if (diff > allowedEditDays && !day.isFrozen) {
         day.isFrozen = true;
         await day.save();
-      } else if (day.isFrozen) {
-        day.isFrozen = false;
-        await day.save();
       }
     }
 
@@ -138,8 +137,51 @@ const getDayByDate = async (dateStr, shopId) => {
 const createDay = async (data) => {
   try {
     data.isFrozen = false;
+
+    const existingDay = await Days.findOne({
+      shopId: data.shopId,
+      date: {
+        $gte: dayjs(data.date).startOf("day").toDate(),
+        $lte: dayjs(data.date).endOf("day").toDate(),
+      },
+    });
+
+    if (existingDay) {
+      const error = new Error("Day already exists for the given date and shop");
+      error.status = 400;
+      throw error;
+    }
+
     const newDay = await Days.create(data);
     logger.info(`[day.service.js] [createDay] - Day created: ${newDay.id}`);
+
+    const defaultMappings = await TemplateExpenseBridge.find({
+      templateId: data.templateId,
+      isDefault: true,
+    });
+
+    const expenseIds = defaultMappings.map((bridge) => bridge.expenseId);
+
+    if (expenseIds.length === 0) {
+      logger.warn(
+        `[day.service.js] [createDay] - No default expenses found for template ${data.templateId}`
+      );
+      return newDay;
+    }
+
+    for (const expenseId of expenseIds) {
+      await DayExpenseService.createDayExpense({
+        dayId: newDay.id,
+        templateId: data.templateId,
+        expenseId,
+        amount: 0,
+      });
+    }
+
+    logger.info(
+      `[day.service.js] [createDay] - ${expenseIds.length} default day expenses created for day ${newDay.id}`
+    );
+
     return newDay;
   } catch (err) {
     logger.error(`[day.service.js] [createDay] - Error: ${err.message}`);

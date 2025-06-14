@@ -81,10 +81,14 @@ const verifyDayExpense = async (req, res) => {
   }
 };
 
-const getDayExpenseById = async (req, res) => {
+const getDayExpenseByDate = async (req, res) => {
   try {
-    const { id } = req.params;
-    const dayExpense = await DayExpenseService.getDayExpenseById(id);
+    const { date } = req.params;
+    const { shopId } = req.query;
+    const dayExpense = await DayExpenseService.getDayExpenseByDate(
+      date,
+      shopId
+    );
     if (!dayExpense) {
       return sendError(
         res,
@@ -204,7 +208,7 @@ const deleteDayExpense = async (req, res) => {
 export {
   createDayExpense,
   getAllDayExpenses,
-  getDayExpenseById,
+  getDayExpenseByDate,
   updateDayExpense,
   deleteDayExpense,
   verifyDayExpense,

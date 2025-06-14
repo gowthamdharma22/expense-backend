@@ -96,6 +96,30 @@ const getExpenseById = async (expenseId) => {
   }
 };
 
+const getExpenseByTemplateId = async (templateId) => {
+  try {
+    const bridges = await TemplateExpenseBridge.find({ templateId }).lean();
+
+    const expenseIds = bridges.map((b) => b.expenseId);
+    const expenses = expenseIds.length
+      ? await Expense.find({ id: { $in: expenseIds } }).lean()
+      : [];
+
+    const expensesWithIsDefault = expenses.map((expense) => {
+      const bridge = bridges.find((b) => b.expenseId === expense.id);
+      return {
+        ...expense,
+        isDefault: bridge?.isDefault ?? false,
+      };
+    });
+
+    return cleanData(expensesWithIsDefault);
+  } catch (err) {
+    logger.error(`[getExpenseByTemplateId] - ${err.message}`);
+    throw new Error("Failed to fetch expenses: " + err.message);
+  }
+};
+
 const updateExpense = async (expenseId, data) => {
   try {
     const existingExpense = await Expense.findOne({ id: expenseId });
@@ -171,4 +195,5 @@ export {
   deleteExpense,
   getAllExpenses,
   getExpenseById,
+  getExpenseByTemplateId,
 };
