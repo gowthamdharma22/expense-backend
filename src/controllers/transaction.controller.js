@@ -6,7 +6,7 @@ import Shop from "../models/Shop.js";
 
 export const adjustTransaction = async (req, res) => {
   try {
-    const { shopId, amount, description } = req.body;
+    const { shopId, amount, description, type } = req.body;
 
     const shop = await Shop.findOne({ id: shopId });
     if (!shop) {
@@ -19,7 +19,7 @@ export const adjustTransaction = async (req, res) => {
       shopType,
       shopId,
       amount,
-      type: "debit",
+      type,
       description,
       dayExpenseId: 0,
       isAdjustment: true,
