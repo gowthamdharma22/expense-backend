@@ -64,8 +64,11 @@ const getExpenseById = async (req, res) => {
 
 const getExpenseByTemplateId = async (req, res) => {
   try {
+    const { templateId } = req.params;
+    const { nonDefault } = req.query;
     const expense = await expenseService.getExpenseByTemplateId(
-      req.params.templateId
+      templateId,
+      nonDefault
     );
     if (!expense) {
       return sendError(

@@ -96,11 +96,17 @@ const getExpenseById = async (expenseId) => {
   }
 };
 
-const getExpenseByTemplateId = async (templateId) => {
+const getExpenseByTemplateId = async (templateId, nonDefault = false) => {
   try {
-    const bridges = await TemplateExpenseBridge.find({ templateId }).lean();
+    const filter = { templateId };
 
+    if (nonDefault) {
+      filter.isDefault = false;
+    }
+
+    const bridges = await TemplateExpenseBridge.find(filter).lean();
     const expenseIds = bridges.map((b) => b.expenseId);
+
     const expenses = expenseIds.length
       ? await Expense.find({ id: { $in: expenseIds } }).lean()
       : [];
