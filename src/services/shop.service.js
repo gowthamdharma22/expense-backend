@@ -8,7 +8,9 @@ const VALID_SHOP_TYPES = ["wholesale", "retail"];
 
 const createShop = async (name, userId, templateId, shopType) => {
   if (!VALID_SHOP_TYPES.includes(shopType)) {
-    const error = new Error("Invalid shopType. Must be 'wholesale' or 'retail'");
+    const error = new Error(
+      "Invalid shopType. Must be 'wholesale' or 'retail'"
+    );
     error.status = 400;
     throw error;
   }
@@ -34,10 +36,22 @@ const createShop = async (name, userId, templateId, shopType) => {
 
 const updateShop = async (shopId, data) => {
   if (data.shopType && !VALID_SHOP_TYPES.includes(data.shopType)) {
-    const error = new Error("Invalid shopType. Must be 'wholesale' or 'retail'");
+    const error = new Error(
+      "Invalid shopType. Must be 'wholesale' or 'retail'"
+    );
     error.status = 400;
     throw error;
   }
+
+  const existingShop = await Shop.findOne({ id: shopId });
+  if (!existingShop) {
+    const error = new Error("Shop not found");
+    error.status = 404;
+    throw error;
+  }
+
+  const oldTemplateId = existingShop.templateId;
+  const newTemplateId = data.templateId;
 
   const updatedShop = await Shop.findOneAndUpdate(
     { id: shopId },
@@ -45,10 +59,18 @@ const updateShop = async (shopId, data) => {
     { new: true }
   );
 
-  if (!updatedShop) {
-    const error = new Error("Shop not found");
-    error.status = 404;
-    throw error;
+  if (newTemplateId && newTemplateId !== oldTemplateId) {
+    if (oldTemplateId) {
+      await Template.updateOne(
+        { id: oldTemplateId },
+        { $pull: { shopIds: shopId } }
+      );
+    }
+
+    await Template.updateOne(
+      { id: newTemplateId },
+      { $addToSet: { shopIds: shopId } }
+    );
   }
 
   return cleanData(updatedShop.toObject());
