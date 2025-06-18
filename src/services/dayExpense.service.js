@@ -39,6 +39,7 @@ const getAllDayExpenses = async () => {
 
 const getDayExpenseByDate = async (dateStr, shopId) => {
   try {
+    console.log(dateStr,shopId,"Kan")
     const parsedDate = dayjs(dateStr, "YYYY-MM-DD", true);
     if (!parsedDate.isValid()) {
       throw new Error("Invalid date format. Use YYYY-MM-DD");
