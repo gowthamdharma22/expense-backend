@@ -39,7 +39,6 @@ const getAllDayExpenses = async () => {
 
 const getDayExpenseByDate = async (dateStr, shopId) => {
   try {
-    console.log(dateStr,shopId,"Kan")
     const parsedDate = dayjs(dateStr, "YYYY-MM-DD", true);
     if (!parsedDate.isValid()) {
       throw new Error("Invalid date format. Use YYYY-MM-DD");
@@ -100,6 +99,7 @@ const getDayExpenseByDate = async (dateStr, shopId) => {
     );
 
     return {
+      templateId: shop.templateId,
       day: cleanData(dayEntry),
       expenses: enrichedExpenses,
       totalAmount,
@@ -165,9 +165,11 @@ const createDayExpense = async (data) => {
 
 const updateDayExpense = async (id, data) => {
   try {
-    if (id == 1 || 2) {
-      throw new Error("Default expenses cannot be updated");
-    }
+    //Todo : Does it needed?
+    // if (id === 1 || id === 2) {
+    //   throw new Error("Default expenses cannot be updated");
+    // }
+
     const updated = await DayExpense.findOneAndUpdate({ id }, data, {
       new: true,
     }).lean();

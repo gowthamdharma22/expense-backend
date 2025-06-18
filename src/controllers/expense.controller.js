@@ -96,7 +96,6 @@ const getExpenseByShopId = async (req, res) => {
   try {
     const { shopId } = req.params;
     const { nonDefault } = req.query;
-    console.log("nonDefault", shopId);
     const expense = await expenseService.getExpenseByShopId(
       shopId,
       nonDefault
