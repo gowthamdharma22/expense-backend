@@ -114,10 +114,12 @@ const getDayExpenseByDate = async (req, res) => {
 const updateDayExpense = async (req, res) => {
   try {
     const { date } = req.params;
-    console.log("date123", req.body);
-    const existing = await DayExpenseService.getDayExpenseByDate(date,req.body.shopId);
+    const existing = await DayExpenseService.getDayExpenseByDate(
+      date,
+      req.body.shopId
+    );
     if (!existing) {
-      return sendError( 
+      return sendError(
         res,
         { message: "DayExpense not found" },
         "Not Found",
@@ -148,7 +150,10 @@ const updateDayExpense = async (req, res) => {
       );
     }
 
-    const updated = await DayExpenseService.updateDayExpense(req.body.expenseId, req.body);
+    const updated = await DayExpenseService.updateDayExpense(
+      req.body.expenseId,
+      req.body
+    );
 
     Activity.Logger(
       { email: req.user?.email, role: req.user?.role },

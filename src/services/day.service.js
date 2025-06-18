@@ -66,9 +66,6 @@ const getDayById = async (dayId) => {
     if (diff > allowedEditDays && !day.isFrozen) {
       day.isFrozen = true;
       await day.save();
-    } else if (day.isFrozen) {
-      day.isFrozen = false;
-      await day.save();
     }
 
     return day;
@@ -136,13 +133,25 @@ const getDayByDate = async (dateStr, shopId) => {
 
 const createDay = async (data) => {
   try {
-    data.isFrozen = false;
+    const shop = await Shop.findOne({ id: data.shopId });
+    if (!shop) {
+      const error = new Error("Shop not found");
+      error.status = 404;
+      throw error;
+    }
+
+    const allowedEditDays = shop.allowedEditDays || 0;
+    const today = dayjs().utc();
+    const targetDate = dayjs(data.date).utc().startOf("day");
+    const diff = today.diff(targetDate, "day");
+
+    data.isFrozen = diff > allowedEditDays;
 
     const existingDay = await Days.findOne({
       shopId: data.shopId,
       date: {
-        $gte: dayjs(data.date).startOf("day").toDate(),
-        $lte: dayjs(data.date).endOf("day").toDate(),
+        $gte: targetDate.toDate(),
+        $lte: targetDate.endOf("day").toDate(),
       },
     });
 
