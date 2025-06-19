@@ -37,6 +37,45 @@ const getAllDayExpenses = async () => {
   }
 };
 
+const getDayExpenseById = async (id, shopId) => {
+  try {
+    const shop = await Shop.findOne({ id: shopId }).lean();
+    if (!shop) {
+      const error = new Error("Shop not found");
+      error.status = 404;
+      throw error;
+    }
+
+    const dayExpense = await DayExpense.findOne({ id }).lean();
+    if (!dayExpense) {
+      const error = new Error("DayExpense not found");
+      error.status = 404;
+      throw error;
+    }
+
+    const [day, expense] = await Promise.all([
+      Days.findOne({ id: dayExpense.dayId }).lean(),
+      Expense.findOne({ id: dayExpense.expenseId }).lean(),
+    ]);
+
+    return {
+      ...cleanData(dayExpense),
+      day: day ? cleanData(day) : null,
+      expense: expense
+        ? {
+            ...cleanData(expense),
+            dayExpenseId: dayExpense.id,
+          }
+        : null,
+    };
+  } catch (err) {
+    logger.error(
+      `[dayExpense.service.js] [getDayExpenseById] - ${err.message}`
+    );
+    throw new Error("Error fetching day expense by ID: " + err.message);
+  }
+};
+
 const getDayExpenseByDate = async (dateStr, shopId) => {
   try {
     const parsedDate = dayjs(dateStr, "YYYY-MM-DD", true);
@@ -244,6 +283,7 @@ export {
   updateDayExpense,
   deleteDayExpense,
   getAllDayExpenses,
+  getDayExpenseById,
   getDayExpenseByDate,
   verifyDayExpense,
 };

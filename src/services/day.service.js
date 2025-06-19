@@ -150,8 +150,8 @@ const createDay = async (data) => {
     const existingDay = await Days.findOne({
       shopId: data.shopId,
       date: {
-        $gte: targetDate.toDate(),
-        $lte: targetDate.endOf("day").toDate(),
+        $gte: dayjs(data.date).startOf("day").toDate(),
+        $lte: dayjs(data.date).endOf("day").toDate(),
       },
     });
 

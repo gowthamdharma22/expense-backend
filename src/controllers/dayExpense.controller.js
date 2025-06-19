@@ -113,9 +113,9 @@ const getDayExpenseByDate = async (req, res) => {
 
 const updateDayExpense = async (req, res) => {
   try {
-    const { date } = req.params;
-    const existing = await DayExpenseService.getDayExpenseByDate(
-      date,
+    const { id } = req.params;
+    const existing = await DayExpenseService.getDayExpenseById(
+      id,
       req.body.shopId
     );
     if (!existing) {
@@ -150,10 +150,7 @@ const updateDayExpense = async (req, res) => {
       );
     }
 
-    const updated = await DayExpenseService.updateDayExpense(
-      req.body.expenseId,
-      req.body
-    );
+    const updated = await DayExpenseService.updateDayExpense(id, req.body);
 
     Activity.Logger(
       { email: req.user?.email, role: req.user?.role },
