@@ -26,7 +26,7 @@ const getAllDays = async (shopId) => {
       if (diff > allowedEditDays && !day.isFrozen) {
         day.isFrozen = true;
         await day.save();
-      } else if (day.isFrozen) {
+      } else if (diff <= allowedEditDays && day.isFrozen) {
         day.isFrozen = false;
         await day.save();
       }
@@ -65,6 +65,9 @@ const getDayById = async (dayId) => {
 
     if (diff > allowedEditDays && !day.isFrozen) {
       day.isFrozen = true;
+      await day.save();
+    } else if (diff <= allowedEditDays && day.isFrozen) {
+      day.isFrozen = false;
       await day.save();
     }
 
@@ -120,6 +123,9 @@ const getDayByDate = async (dateStr, shopId) => {
 
       if (diff > allowedEditDays && !day.isFrozen) {
         day.isFrozen = true;
+        await day.save();
+      } else if (diff <= allowedEditDays && day.isFrozen) {
+        day.isFrozen = false;
         await day.save();
       }
     }
