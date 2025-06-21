@@ -68,16 +68,24 @@ const getDayByDate = async (req, res) => {
   try {
     const { date } = req.params;
     const { shopId } = req.query;
-    const day = await DayService.getDayByDate(date, shopId);
-    if (!day) {
+    const { days, allowedEditDays } = await DayService.getDayByDate(
+      date,
+      shopId
+    );
+    if (!days) {
       return sendError(
         res,
         { message: "Day not found" },
-        "Failed to fetch day",
+        "Failed to fetch days",
         404
       );
     }
-    sendSuccess(res, day, "Day fetched successfully", 200);
+    sendSuccess(
+      res,
+      { days, allowedEditDays },
+      "Day fetched successfully",
+      200
+    );
   } catch (err) {
     logger.error(`[day.controller.js] [getDayByDate] - ${err.message}`);
     sendError(

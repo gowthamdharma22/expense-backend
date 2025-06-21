@@ -46,9 +46,26 @@ export const adjustTransaction = async (req, res) => {
 export const getTransactionRecordsByShopId = async (req, res) => {
   try {
     const { shopId } = req.params;
-    const result = await transactionService.getTransactionsByShopId(
-      Number(shopId)
-    );
+    const { filter } = req.query;
+
+    let month = null;
+    let day = null;
+
+    console.log("query", filter);
+    if (filter) {
+      if (/^\d{4}-\d{1,2}-\d{2}$/.test(filter)) {
+        day = filter;
+      } else if (/^\d{4}-\d{1,2}$/.test(filter)) {
+        month = filter;
+      }
+    }
+
+    console.log(month, day, "DAY");
+    const result = await transactionService.getTransactionsByShopId({
+      shopId: Number(shopId),
+      month,
+      day,
+    });
 
     sendSuccess(res, result, "Transaction records fetched successfully", 200);
   } catch (err) {

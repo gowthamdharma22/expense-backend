@@ -130,7 +130,11 @@ const getDayByDate = async (dateStr, shopId) => {
       }
     }
 
-    return days;
+    // 🔁 Return both days and allowedEditDays
+    return {
+      days,
+      allowedEditDays,
+    };
   } catch (err) {
     logger.error(`[day.service.js] [getDayByDate] - Error: ${err.message}`);
     throw new Error("Error fetching day by date: " + err.message);

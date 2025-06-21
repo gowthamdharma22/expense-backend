@@ -2,7 +2,7 @@ import WholesaleTransaction from "../models/WholeSaleTransaction.js";
 import RetailTransaction from "../models/RetailTransaction.js";
 import logger from "../utils/logger.js";
 import Shop from "../models/Shop.js";
-
+import dayjs from "dayjs";
 export const recordTransaction = async ({
   shopType,
   shopId,
@@ -35,10 +35,9 @@ export const recordTransaction = async ({
   }
 };
 
-export const getTransactionsByShopId = async (shopId) => {
+export const getTransactionsByShopId = async ({ shopId, month, day }) => {
   try {
     const shop = await Shop.findOne({ id: shopId });
-
     if (!shop) {
       throw new Error("Shop not found");
     }
@@ -47,7 +46,29 @@ export const getTransactionsByShopId = async (shopId) => {
     const Model =
       shopType === "wholesale" ? WholesaleTransaction : RetailTransaction;
 
-    const records = await Model.find({ shopId }).sort({ createdAt: -1 });
+    const query = { shopId };
+
+    if (day) {
+      const parsedDay = dayjs(day, "YYYY-MM-DD", true);
+      if (!parsedDay.isValid()) {
+        throw new Error("Invalid day format. Expected YYYY-MM-DD.");
+      }
+
+      const start = parsedDay.startOf("day").toDate();
+      const end = parsedDay.endOf("day").toDate();
+      query.createdAt = { $gte: start, $lte: end };
+    } else if (month) {
+      const parsedMonth = dayjs(month, "YYYY-MM", true);
+      if (!parsedMonth.isValid()) {
+        throw new Error("Invalid month format. Expected YYYY-MM.");
+      }
+
+      const start = parsedMonth.startOf("month").toDate();
+      const end = parsedMonth.endOf("month").toDate();
+      query.createdAt = { $gte: start, $lte: end };
+    }
+
+    const records = await Model.find(query).sort({ createdAt: -1 });
 
     const credit = records
       .filter((r) => r.type === "credit")
@@ -64,6 +85,6 @@ export const getTransactionsByShopId = async (shopId) => {
     logger.error(
       `[transaction.service.js] [getTransactionsByShopId] - ${err.message}`
     );
-    throw new Error("Transaction lookup failed");
+    throw new Error(err.message || "Transaction lookup failed");
   }
 };
