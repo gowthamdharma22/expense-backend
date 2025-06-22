@@ -51,7 +51,6 @@ export const getTransactionRecordsByShopId = async (req, res) => {
     let month = null;
     let day = null;
 
-    console.log("query", filter);
     if (filter) {
       if (/^\d{4}-\d{1,2}-\d{2}$/.test(filter)) {
         day = filter;
@@ -60,7 +59,6 @@ export const getTransactionRecordsByShopId = async (req, res) => {
       }
     }
 
-    console.log(month, day, "DAY");
     const result = await transactionService.getTransactionsByShopId({
       shopId: Number(shopId),
       month,
