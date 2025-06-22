@@ -1,8 +1,11 @@
-import Shop from "../models/Shop.js";
-import Days from "../models/Day.js";
-import logger from "../utils/logger.js";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js";
+import logger from "../utils/logger.js";
+import Shop from "../models/Shop.js";
+import Days from "../models/Day.js";
+import DayExpenses from "../models/DayExpenses.js";
+import WholeSaleTransaction from "../models/WholeSaleTransaction.js";
+import RetailTransaction from "../models/RetailTransaction.js";
 import * as DayExpenseService from "./dayExpense.service.js";
 import TemplateExpenseBridge from "../models/TemplateExpenseBridge.js";
 dayjs.extend(utc);
@@ -141,6 +144,73 @@ const getDayByDate = async (dateStr, shopId) => {
   }
 };
 
+const deleteDayByDate = async (dateStr, shopId) => {
+  try {
+    const shop = await Shop.findOne({ id: shopId });
+    if (!shop) {
+      throw new Error("Shop not found");
+    }
+
+    const parsedDate = dayjs(dateStr, ["YYYY-MM-DD", "YYYY-MM", "YYYY"], true);
+    if (!parsedDate.isValid()) {
+      throw new Error("Invalid date format. Use YYYY-MM-DD, YYYY-MM or YYYY");
+    }
+
+    let startDate, endDate;
+    if (dateStr.length === 10) {
+      startDate = parsedDate.startOf("day");
+      endDate = parsedDate.endOf("day");
+    } else if (dateStr.length === 7) {
+      startDate = parsedDate.startOf("month");
+      endDate = parsedDate.endOf("month");
+    } else if (dateStr.length === 4) {
+      startDate = parsedDate.startOf("year");
+      endDate = parsedDate.endOf("year");
+    } else {
+      throw new Error("Unsupported date format");
+    }
+
+    const daysToDelete = await Days.find({
+      shopId,
+      date: {
+        $gte: startDate.toDate(),
+        $lte: endDate.toDate(),
+      },
+    });
+
+    if (daysToDelete.length === 0) {
+      throw new Error("No days found for the given date range and shop");
+    }
+
+    const dayIds = daysToDelete.map((day) => day.id);
+
+    const dayExpenses = await DayExpenses.find({
+      dayId: { $in: dayIds },
+    });
+
+    const dayExpenseIds = dayExpenses.map((d) => d.id);
+
+    const transactionModel =
+      shop.shopType === "wholesale" ? WholeSaleTransaction : RetailTransaction;
+
+    await transactionModel.deleteMany({
+      dayExpenseId: { $in: dayExpenseIds },
+    });
+
+    await DayExpenses.deleteMany({ dayId: { $in: dayIds } });
+    await Days.deleteMany({ id: { $in: dayIds } });
+
+    logger.info(
+      `[day.service.js] [deleteDayByDate] - Deleted ${dayIds.length} day(s) and related records`
+    );
+
+    return true;
+  } catch (err) {
+    logger.error(`[day.service.js] [deleteDayByDate] - Error: ${err.message}`);
+    throw new Error("Error deleting day(s) by date: " + err.message);
+  }
+};
+
 const createDay = async (data) => {
   try {
     const shop = await Shop.findOne({ id: data.shopId });
@@ -271,4 +341,5 @@ export {
   createDay,
   updateDay,
   deleteDay,
+  deleteDayByDate,
 };

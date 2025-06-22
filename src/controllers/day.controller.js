@@ -169,6 +169,30 @@ const deleteDay = async (req, res) => {
   }
 };
 
+const deleteDayByDate = async (req, res) => {
+  try {
+    const { date } = req.params;
+    const { shopId } = req.query;
+
+    if (!date || !shopId) {
+      return res.status(400).json({
+        message: "Missing required fields: date or shopId",
+      });
+    }
+
+    await DayService.deleteDayByDate(date, parseInt(shopId));
+
+    return res.status(200).json({
+      message: `Day(s) and related data successfully deleted for date: ${date}`,
+    });
+  } catch (err) {
+    logger.error(`[day.controller.js] [deleteDayByDate] - ${err.message}`);
+    return res.status(err.status || 500).json({
+      message: err.message || "Failed to delete day by date",
+    });
+  }
+};
+
 export {
   createDay,
   getAllDays,
@@ -176,4 +200,5 @@ export {
   getDayByDate,
   updateDay,
   deleteDay,
+  deleteDayByDate,
 };

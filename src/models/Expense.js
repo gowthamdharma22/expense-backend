@@ -7,7 +7,7 @@ const expenseSchema = new Schema(
   {
     id: { type: Number, unique: true },
     name: { type: String, required: true },
-    description: { type: String, required: true },
+    description: { type: String },
     type: {
       type: String,
       enum: ["credit", "debit", "credit/debit"],
@@ -25,8 +25,8 @@ expenseSchema.plugin(autoIncrement, {
 
 expenseSchema.statics.ensureDefaults = async function () {
   const defaults = [
-    { name: "credit", description: "Default credit expense", type: "credit" },
-    { name: "debit", description: "Default debit expense", type: "debit" },
+    { name: "Credit", description: "Default credit expense", type: "credit" },
+    { name: "Debit", description: "Default debit expense", type: "debit" },
   ];
 
   for (const def of defaults) {

@@ -5,5 +5,6 @@ const router = express.Router();
 
 router.post("/adjust", transactionController.adjustTransaction);
 router.get("/:shopId", transactionController.getTransactionRecordsByShopId);
+router.get("/notes/:shopId", transactionController.getUserwiseTransactionSummary);
 
 export default router;

@@ -80,3 +80,34 @@ export const getTransactionRecordsByShopId = async (req, res) => {
     );
   }
 };
+
+export const getUserwiseTransactionSummary = async (req, res) => {
+  try {
+    const { shopId } = req.params;
+
+    if (!shopId) {
+      return sendError(
+        res,
+        { message: "Missing shopId in query" },
+        "Missing shopId",
+        400
+      );
+    }
+
+    const result = await transactionService.getUserwiseTransactionSummary(
+      Number(shopId)
+    );
+
+    sendSuccess(res, result, "User-wise transaction summary fetched", 200);
+  } catch (err) {
+    logger.error(
+      `[transaction.controller.js] [getUserwiseTransactionSummary] - ${err.message}`
+    );
+    sendError(
+      res,
+      { message: err.message },
+      "Failed to fetch user-wise transaction summary",
+      err.status || 500
+    );
+  }
+};
