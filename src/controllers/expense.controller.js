@@ -92,6 +92,36 @@ const getExpenseByTemplateId = async (req, res) => {
   }
 };
 
+const getExpenseByShopId = async (req, res) => {
+  try {
+    const { shopId } = req.params;
+    const { nonDefault } = req.query;
+    const expense = await expenseService.getExpenseByShopId(
+      shopId,
+      nonDefault
+    );
+    if (!expense) {
+      return sendError(
+        res,
+        { message: "Expense not found" },
+        "Failed to fetch expense",
+        404
+      );
+    }
+    sendSuccess(res, expense, "Expense fetched successfully", 200);
+  } catch (err) {
+    logger.error(
+      `[expense.controller.js] [getExpenseByTemplateId] - ${err.message}`
+    );
+    sendError(
+      res,
+      { message: err.message },
+      "Failed to fetch expense",
+      err.status || 500
+    );
+  }
+};
+
 const updateExpense = async (req, res) => {
   try {
     const updatedExpense = await expenseService.updateExpense(
@@ -161,6 +191,7 @@ const deleteExpense = async (req, res) => {
 export {
   getExpenseById,
   getExpenseByTemplateId,
+  getExpenseByShopId,
   getAllExpenses,
   createNewExpense,
   updateExpense,

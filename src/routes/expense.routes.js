@@ -6,7 +6,7 @@ const router = Router();
 router.get("/", expenseController.getAllExpenses);
 router.get("/:id", expenseController.getExpenseById);
 router.get("/template/:templateId", expenseController.getExpenseByTemplateId);
-
+router.get("/shop/:shopId", expenseController.getExpenseByShopId);
 router.post("/", expenseController.createNewExpense);
 router.put("/:id", expenseController.updateExpense);
 router.delete("/:id", expenseController.deleteExpense);

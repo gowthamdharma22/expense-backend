@@ -3,10 +3,11 @@ import * as DayService from "../services/day.service.js";
 import * as Activity from "../services/activity.service.js";
 import { sendSuccess, sendError } from "../utils/responseHandler.js";
 import * as DayExpenseService from "../services/dayExpense.service.js";
+import CreditDebitUser from "../models/CreditDebitUser.js";
 
 const createDayExpense = async (req, res) => {
   try {
-    const { dayId } = req.body;
+    const { dayId, expenseId, userId } = req.body;
 
     const day = await DayService.getDayById(dayId);
     if (!day) {
@@ -19,6 +20,27 @@ const createDayExpense = async (req, res) => {
         "Cannot create DayExpense",
         400
       );
+    }
+
+    if (expenseId === 1 || expenseId === 2) {
+      if (!userId) {
+        return sendError(
+          res,
+          { message: "userId is required for credit/debit expenses" },
+          "Missing userId",
+          400
+        );
+      }
+
+      const userExists = await CreditDebitUser.findOne({ id: userId });
+      if (!userExists) {
+        return sendError(
+          res,
+          { message: "Invalid userId. No such credit/debit user exists" },
+          "Invalid userId",
+          400
+        );
+      }
     }
 
     const newDayExpense = await DayExpenseService.createDayExpense(req.body);
@@ -114,7 +136,11 @@ const getDayExpenseByDate = async (req, res) => {
 const updateDayExpense = async (req, res) => {
   try {
     const { id } = req.params;
-    const existing = await DayExpenseService.getDayExpenseById(id);
+    const { expenseId, userId } = req.body;
+    const existing = await DayExpenseService.getDayExpenseById(
+      id,
+      req.body.shopId
+    );
     if (!existing) {
       return sendError(
         res,
@@ -124,7 +150,7 @@ const updateDayExpense = async (req, res) => {
       );
     }
 
-    const day = await DayService.getDayById(existing.dayId);
+    const day = await DayService.getDayById(req.body.dayId);
     if (!day) {
       return sendError(res, { message: "Day not found" }, "Invalid Day", 404);
     }
@@ -147,11 +173,32 @@ const updateDayExpense = async (req, res) => {
       );
     }
 
+    if (expenseId === 1 || expenseId === 2) {
+      if (!userId) {
+        return sendError(
+          res,
+          { message: "userId is required for credit/debit expenses" },
+          "Missing userId",
+          400
+        );
+      }
+
+      const userExists = await CreditDebitUser.findOne({ id: userId });
+      if (!userExists) {
+        return sendError(
+          res,
+          { message: "Invalid userId. No such credit/debit user exists" },
+          "Invalid userId",
+          400
+        );
+      }
+    }
+
     const updated = await DayExpenseService.updateDayExpense(id, req.body);
 
     Activity.Logger(
       { email: req.user?.email, role: req.user?.role },
-      `Updated day expense (${id})`
+      `Updated day expense (${req.body.dayId})`
     );
 
     sendSuccess(res, updated, "DayExpense updated successfully", 200);

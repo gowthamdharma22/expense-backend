@@ -126,6 +126,42 @@ const getExpenseByTemplateId = async (templateId, nonDefault = false) => {
   }
 };
 
+const getExpenseByShopId = async (shopId, nonDefault = false) => {
+  try {
+    const shop = await Shop.findOne({ id: shopId }).lean();
+    if (!shop) return [];
+
+    const templateId = shop.templateId;
+    if (!templateId) return [];
+
+    const filter = { templateId };
+    if (nonDefault) filter.isDefault = false;
+
+    const bridges = await TemplateExpenseBridge.find(filter).lean();
+
+    const expenseIds = bridges
+      .map((b) => b.expenseId)
+      .filter((id) => ![1, 2].includes(Number(id))); // Exclude expenseId 1 and 2
+
+    const expenses = expenseIds.length
+      ? await Expense.find({ id: { $in: expenseIds } }).lean()
+      : [];
+
+    const expensesWithIsDefault = expenses.map((expense) => {
+      const bridge = bridges.find((b) => b.expenseId === expense.id);
+      return {
+        ...expense,
+        isDefault: bridge?.isDefault ?? false,
+      };
+    });
+
+    return cleanData(expensesWithIsDefault);
+  } catch (err) {
+    logger.error(`[getExpenseByShopId] - ${err.message}`);
+    throw new Error("Failed to fetch expenses: " + err.message);
+  }
+};
+
 const updateExpense = async (expenseId, data) => {
   try {
     const existingExpense = await Expense.findOne({ id: expenseId });
@@ -202,4 +238,5 @@ export {
   getAllExpenses,
   getExpenseById,
   getExpenseByTemplateId,
+  getExpenseByShopId,
 };

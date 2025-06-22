@@ -46,9 +46,24 @@ export const adjustTransaction = async (req, res) => {
 export const getTransactionRecordsByShopId = async (req, res) => {
   try {
     const { shopId } = req.params;
-    const result = await transactionService.getTransactionsByShopId(
-      Number(shopId)
-    );
+    const { filter } = req.query;
+
+    let month = null;
+    let day = null;
+
+    if (filter) {
+      if (/^\d{4}-\d{1,2}-\d{2}$/.test(filter)) {
+        day = filter;
+      } else if (/^\d{4}-\d{1,2}$/.test(filter)) {
+        month = filter;
+      }
+    }
+
+    const result = await transactionService.getTransactionsByShopId({
+      shopId: Number(shopId),
+      month,
+      day,
+    });
 
     sendSuccess(res, result, "Transaction records fetched successfully", 200);
   } catch (err) {
@@ -59,6 +74,37 @@ export const getTransactionRecordsByShopId = async (req, res) => {
       res,
       { message: err.message },
       "Failed to fetch transaction records",
+      err.status || 500
+    );
+  }
+};
+
+export const getUserwiseTransactionSummary = async (req, res) => {
+  try {
+    const { shopId } = req.params;
+
+    if (!shopId) {
+      return sendError(
+        res,
+        { message: "Missing shopId in query" },
+        "Missing shopId",
+        400
+      );
+    }
+
+    const result = await transactionService.getUserwiseTransactionSummary(
+      Number(shopId)
+    );
+
+    sendSuccess(res, result, "User-wise transaction summary fetched", 200);
+  } catch (err) {
+    logger.error(
+      `[transaction.controller.js] [getUserwiseTransactionSummary] - ${err.message}`
+    );
+    sendError(
+      res,
+      { message: err.message },
+      "Failed to fetch user-wise transaction summary",
       err.status || 500
     );
   }

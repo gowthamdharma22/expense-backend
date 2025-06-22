@@ -10,6 +10,7 @@ import expenseRoutes from "./src/routes/expense.routes.js";
 import templateRoutes from "./src/routes/template.routes.js";
 import dayExpenseRoutes from "./src/routes/dayExpense.routes.js";
 import transactionRoutes from "./src/routes/transaction.routes.js";
+import creditDebitUserRoutes from "./src/routes/creditDebitUser.routes.js";
 import { admin, protect } from "./src/middlewares/authMiddleware.js";
 
 dotenv.config();
@@ -28,6 +29,7 @@ app.use("/api/day", protect, dayRoutes);
 app.use("/api/day-expense", protect, dayExpenseRoutes);
 app.use("/api/activity", protect, activityRoute);
 app.use("/api/transaction", protect, admin, transactionRoutes);
+app.use("/api/notes/user", protect, admin, creditDebitUserRoutes);
 
 const PORT = process.env.PORT || 5000;
 

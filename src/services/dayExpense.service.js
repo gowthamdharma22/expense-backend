@@ -37,6 +37,45 @@ const getAllDayExpenses = async () => {
   }
 };
 
+const getDayExpenseById = async (id, shopId) => {
+  try {
+    const shop = await Shop.findOne({ id: shopId }).lean();
+    if (!shop) {
+      const error = new Error("Shop not found");
+      error.status = 404;
+      throw error;
+    }
+
+    const dayExpense = await DayExpense.findOne({ id }).lean();
+    if (!dayExpense) {
+      const error = new Error("DayExpense not found");
+      error.status = 404;
+      throw error;
+    }
+
+    const [day, expense] = await Promise.all([
+      Days.findOne({ id: dayExpense.dayId }).lean(),
+      Expense.findOne({ id: dayExpense.expenseId }).lean(),
+    ]);
+
+    return {
+      ...cleanData(dayExpense),
+      day: day ? cleanData(day) : null,
+      expense: expense
+        ? {
+            ...cleanData(expense),
+            dayExpenseId: dayExpense.id,
+          }
+        : null,
+    };
+  } catch (err) {
+    logger.error(
+      `[dayExpense.service.js] [getDayExpenseById] - ${err.message}`
+    );
+    throw new Error("Error fetching day expense by ID: " + err.message);
+  }
+};
+
 const getDayExpenseByDate = async (dateStr, shopId) => {
   try {
     const parsedDate = dayjs(dateStr, "YYYY-MM-DD", true);
@@ -76,7 +115,8 @@ const getDayExpenseByDate = async (dateStr, shopId) => {
       dayId: dayEntry.id,
     }).lean();
 
-    let totalAmount = 0;
+    let totalCredits = 0;
+    let totalDebits = 0;
 
     const enrichedExpenses = await Promise.all(
       dayExpenses.map(async (dayExpense) => {
@@ -86,22 +126,31 @@ const getDayExpenseByDate = async (dateStr, shopId) => {
 
         const type = expense?.type;
         if (type === "credit") {
-          totalAmount += dayExpense.amount || 0;
+          totalCredits += dayExpense.amount || 0;
         } else if (type === "debit") {
-          totalAmount -= dayExpense.amount || 0;
+          totalDebits += dayExpense.amount || 0;
         }
 
         return {
           ...cleanData(dayExpense),
-          expense: expense ? cleanData(expense) : null,
+          expense: expense
+            ? {
+                ...cleanData(expense),
+                dayExpenseId: dayExpense.id,
+              }
+            : null,
         };
       })
     );
 
+    const cashDifference = Math.max(0, totalCredits - totalDebits);
+
     return {
+      templateId: shop.templateId,
       day: cleanData(dayEntry),
       expenses: enrichedExpenses,
-      totalAmount,
+      cashDifference,
+      totalAmount: totalCredits, // 'total' = credits
     };
   } catch (err) {
     logger.error(
@@ -113,7 +162,7 @@ const getDayExpenseByDate = async (dateStr, shopId) => {
 
 const createDayExpense = async (data) => {
   try {
-    const { expenseId, templateId, amount, description } = data;
+    const { expenseId, templateId, amount, description, userId } = data;
 
     const newDayExpense = new DayExpense(data);
 
@@ -145,6 +194,7 @@ const createDayExpense = async (data) => {
           type,
           description,
           dayExpenseId: saved.id,
+          userId,
         });
       }
     }
@@ -164,9 +214,19 @@ const createDayExpense = async (data) => {
 
 const updateDayExpense = async (id, data) => {
   try {
-    if (id == 1 || 2) {
-      throw new Error("Default expenses cannot be updated");
+    const existing = await DayExpense.findOne({ id });
+    if (!existing) {
+      const error = new Error("DayExpense not found");
+      error.status = 404;
+      throw error;
     }
+
+    if (existing.isVerified) {
+      const error = new Error("Verified day expense cannot be edited");
+      error.status = 403;
+      throw error;
+    }
+
     const updated = await DayExpense.findOneAndUpdate({ id }, data, {
       new: true,
     }).lean();
@@ -193,7 +253,7 @@ const verifyDayExpense = async (id, status) => {
   try {
     const updated = await DayExpense.findOneAndUpdate(
       { id },
-      { verified: status },
+      { isVerified: Boolean(status) },
       { new: true }
     ).lean();
 
@@ -217,7 +277,21 @@ const verifyDayExpense = async (id, status) => {
 
 const deleteDayExpense = async (id) => {
   try {
+    const existing = await DayExpense.findOne({ id });
+    if (!existing) {
+      const error = new Error("DayExpense not found");
+      error.status = 404;
+      throw error;
+    }
+
+    if (existing.isVerified) {
+      const error = new Error("Verified day expense cannot be deleted");
+      error.status = 403;
+      throw error;
+    }
+
     const deleted = await DayExpense.findOneAndDelete({ id }).lean();
+
     if (!deleted) {
       const error = new Error("DayExpense not found");
       error.status = 404;
@@ -241,6 +315,7 @@ export {
   updateDayExpense,
   deleteDayExpense,
   getAllDayExpenses,
+  getDayExpenseById,
   getDayExpenseByDate,
   verifyDayExpense,
 };

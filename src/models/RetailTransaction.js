@@ -12,6 +12,7 @@ const retailTransactionSchema = new Schema(
     type: { type: String, enum: ["credit", "debit"], required: true },
     description: { type: String },
     dayExpenseId: { type: Number, ref: "DayExpense", default: 0 },
+    userId: { type: Number, ref: "CreditDebitUser", required: true },
     isAdjustment: { type: Boolean, default: false },
   },
   { timestamps: true }

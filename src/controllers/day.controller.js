@@ -68,16 +68,24 @@ const getDayByDate = async (req, res) => {
   try {
     const { date } = req.params;
     const { shopId } = req.query;
-    const day = await DayService.getDayByDate(date, shopId);
-    if (!day) {
+    const { days, allowedEditDays } = await DayService.getDayByDate(
+      date,
+      shopId
+    );
+    if (!days) {
       return sendError(
         res,
         { message: "Day not found" },
-        "Failed to fetch day",
+        "Failed to fetch days",
         404
       );
     }
-    sendSuccess(res, day, "Day fetched successfully", 200);
+    sendSuccess(
+      res,
+      { days, allowedEditDays },
+      "Day fetched successfully",
+      200
+    );
   } catch (err) {
     logger.error(`[day.controller.js] [getDayByDate] - ${err.message}`);
     sendError(
@@ -161,6 +169,30 @@ const deleteDay = async (req, res) => {
   }
 };
 
+const deleteDayByDate = async (req, res) => {
+  try {
+    const { date } = req.params;
+    const { shopId } = req.query;
+
+    if (!date || !shopId) {
+      return res.status(400).json({
+        message: "Missing required fields: date or shopId",
+      });
+    }
+
+    await DayService.deleteDayByDate(date, parseInt(shopId));
+
+    return res.status(200).json({
+      message: `Day(s) and related data successfully deleted for date: ${date}`,
+    });
+  } catch (err) {
+    logger.error(`[day.controller.js] [deleteDayByDate] - ${err.message}`);
+    return res.status(err.status || 500).json({
+      message: err.message || "Failed to delete day by date",
+    });
+  }
+};
+
 export {
   createDay,
   getAllDays,
@@ -168,4 +200,5 @@ export {
   getDayByDate,
   updateDay,
   deleteDay,
+  deleteDayByDate,
 };
