@@ -103,11 +103,11 @@ const verifyDayExpense = async (req, res) => {
   }
 };
 
-const getDayExpenseByDate = async (req, res) => {
+const getDayExpenseByMonth = async (req, res) => {
   try {
     const { date } = req.params;
     const { shopId } = req.query;
-    const dayExpense = await DayExpenseService.getDayExpenseByDate(
+    const dayExpense = await DayExpenseService.getDayExpenseForMonth(
       date,
       shopId
     );
@@ -255,7 +255,7 @@ const deleteDayExpense = async (req, res) => {
 export {
   createDayExpense,
   getAllDayExpenses,
-  getDayExpenseByDate,
+  getDayExpenseByMonth,
   updateDayExpense,
   deleteDayExpense,
   verifyDayExpense,
