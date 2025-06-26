@@ -9,7 +9,7 @@ import * as DayService from "./day.service.js";
 import Shop from "../models/Shop.js";
 import dayjs from "dayjs";
 
-const getAllDayExpenses = async () => {
+export const getAllDayExpenses = async () => {
   try {
     const dayExpenses = await DayExpense.find().lean();
 
@@ -37,7 +37,7 @@ const getAllDayExpenses = async () => {
   }
 };
 
-const getDayExpenseById = async (id, shopId) => {
+export const getDayExpenseById = async (id, shopId) => {
   try {
     const shop = await Shop.findOne({ id: shopId }).lean();
     if (!shop) {
@@ -76,7 +76,124 @@ const getDayExpenseById = async (id, shopId) => {
   }
 };
 
-const getDayExpenseByDate = async (dateStr, shopId) => {
+export const ensureDaysForMonth = async (monthStr, shopId) => {
+  try {
+    const parsedMonth = dayjs(monthStr, "YYYY-MM", true);
+    if (!parsedMonth.isValid()) {
+      throw new Error("Invalid month format. Use YYYY-MM");
+    }
+
+    const shop = await Shop.findOne({ id: shopId }).lean();
+    if (!shop) {
+      const error = new Error("Shop not found");
+      error.status = 404;
+      throw error;
+    }
+
+    const startDate = parsedMonth.startOf("month");
+    const endDate = parsedMonth.endOf("month");
+    const daysInMonth = endDate.date();
+
+    const existingDays = await Days.find({
+      shopId,
+      date: {
+        $gte: startDate.toDate(),
+        $lte: endDate.toDate(),
+      },
+    }).lean();
+
+    const existingDatesSet = new Set(
+      existingDays.map((d) => dayjs(d.date).format("YYYY-MM-DD"))
+    );
+
+    const createdDates = [];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDate = parsedMonth.date(day).format("YYYY-MM-DD");
+
+      if (!existingDatesSet.has(currentDate)) {
+        await DayService.createDay({
+          shopId,
+          date: currentDate,
+          templateId: shop.templateId,
+        });
+        createdDates.push(currentDate);
+      }
+    }
+
+    return {
+      message: "Days created successfully",
+      createdCount: createdDates.length,
+      createdDates,
+    };
+  } catch (err) {
+    logger.error(
+      `[dayExpense.service.js] [ensureDaysForMonth] - Error: ${err.message}`
+    );
+    throw new Error("Error creating missing days for the month");
+  }
+};
+
+export const getDayExpenseForMonth = async (monthStr, shopId) => {
+  try {
+    await ensureDaysForMonth(monthStr, shopId);
+
+    const parsedMonth = dayjs(monthStr, "YYYY-MM", true);
+    const start = parsedMonth.startOf("month").toDate();
+    const end = parsedMonth.endOf("month").toDate();
+
+    const days = await Days.find({
+      shopId,
+      date: { $gte: start, $lte: end },
+    })
+      .sort({ date: 1 })
+      .lean();
+
+    const results = await Promise.all(
+      days.map(async (day) => {
+        const dayExpenses = await DayExpense.find({
+          dayId: day.id,
+        }).lean();
+
+        let totalCredit = 0;
+        let totalDebit = 0;
+
+        const expenses = await Promise.all(
+          dayExpenses.map(async (d) => {
+            const expense = await Expense.findOne({ id: d.expenseId }).lean();
+            const type = expense?.type;
+
+            if (type === "credit") totalCredit += d.amount || 0;
+            if (type === "debit") totalDebit += d.amount || 0;
+
+            return {
+              ...cleanData(d),
+              expense: expense
+                ? { ...cleanData(expense), dayExpenseId: d.id }
+                : null,
+            };
+          })
+        );
+
+        return {
+          day: cleanData(day),
+          totalCredit,
+          totalDebit,
+          cashDifference: Math.max(0, totalCredit - totalDebit),
+          expenses,
+        };
+      })
+    );
+
+    return results;
+  } catch (err) {
+    throw new Error(
+      `[getDayExpenseForMonth] Error: ${err.message || "Something went wrong"}`
+    );
+  }
+};
+
+export const getDayExpenseByDate = async (dateStr, shopId) => {
   try {
     const parsedDate = dayjs(dateStr, "YYYY-MM-DD", true);
     if (!parsedDate.isValid()) {
@@ -160,7 +277,7 @@ const getDayExpenseByDate = async (dateStr, shopId) => {
   }
 };
 
-const createDayExpense = async (data) => {
+export const createDayExpense = async (data) => {
   try {
     const { expenseId, templateId, amount, description, userId } = data;
 
@@ -212,7 +329,7 @@ const createDayExpense = async (data) => {
   }
 };
 
-const updateDayExpense = async (id, data) => {
+export const updateDayExpense = async (id, data) => {
   try {
     const existing = await DayExpense.findOne({ id });
     if (!existing) {
@@ -249,7 +366,7 @@ const updateDayExpense = async (id, data) => {
   }
 };
 
-const verifyDayExpense = async (id, status) => {
+export const verifyDayExpense = async (id, status) => {
   try {
     const updated = await DayExpense.findOneAndUpdate(
       { id },
@@ -275,7 +392,7 @@ const verifyDayExpense = async (id, status) => {
   }
 };
 
-const deleteDayExpense = async (id) => {
+export const deleteDayExpense = async (id) => {
   try {
     const existing = await DayExpense.findOne({ id });
     if (!existing) {
@@ -308,14 +425,4 @@ const deleteDayExpense = async (id) => {
     );
     throw new Error("Error deleting day expense: " + err.message);
   }
-};
-
-export {
-  createDayExpense,
-  updateDayExpense,
-  deleteDayExpense,
-  getAllDayExpenses,
-  getDayExpenseById,
-  getDayExpenseByDate,
-  verifyDayExpense,
 };
