@@ -5,6 +5,7 @@ const router = express.Router();
 
 router.get("/", dayController.getAllDays);
 router.get("/date/:date", dayController.getDayByDate); // format needs to be ->  YYYY-MM-DD || YYYY-MM || YYYY
+router.get("/activeMonths", dayController.getActiveMonths);
 router.get("/:id", dayController.getDayById);
 
 router.post("/", dayController.createDay);

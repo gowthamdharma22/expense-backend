@@ -144,6 +144,43 @@ const getDayByDate = async (dateStr, shopId) => {
   }
 };
 
+const getActiveMonths = async (shopId) => {
+  try {
+    const days = await Days.find({ shopId }).lean();
+
+    const monthsMap = new Map();
+
+    for (const day of days) {
+      if (day.date) {
+        const monthKey = dayjs(day.date).format("YYYY-MM");
+
+        if (!monthsMap.has(monthKey)) {
+          monthsMap.set(monthKey, []);
+        }
+
+        monthsMap.get(monthKey).push({
+          id: day.id,
+          date: day.date,
+          isVerified: day.isVerified,
+          isFrozen: day.isFrozen,
+        });
+      }
+    }
+
+    const result = [...monthsMap.entries()]
+      .sort((a, b) => dayjs(a[0]).isBefore(dayjs(b[0]) ? -1 : 1))
+      .map(([month, days]) => ({
+        month,
+        days,
+      }));
+
+    return result;
+  } catch (err) {
+    logger.error(`[day.service.js] [getActiveMonths] - ${err.message}`);
+    throw new Error("Error fetching active months: " + err.message);
+  }
+};
+
 const deleteDayByDate = async (dateStr, shopId) => {
   try {
     const shop = await Shop.findOne({ id: shopId });
@@ -337,6 +374,7 @@ const deleteDay = async (id) => {
 export {
   getAllDays,
   getDayByDate,
+  getActiveMonths,
   getDayById,
   createDay,
   updateDay,
