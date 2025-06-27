@@ -97,6 +97,28 @@ const getDayByDate = async (req, res) => {
   }
 };
 
+const getActiveMonths = async (req, res) => {
+  try {
+    const { shopId } = req.query;
+
+    if (!shopId) {
+      return sendError(res, { message: "Missing shopId" }, "Bad Request", 400);
+    }
+
+    const months = await DayService.getActiveMonths(Number(shopId));
+
+    sendSuccess(res, months, "Fetched active months successfully", 200);
+  } catch (err) {
+    logger.error(`[day.controller.js] [getActiveMonths] - ${err.message}`);
+    sendError(
+      res,
+      { message: err.message },
+      "Failed to fetch active months",
+      err.status || 500
+    );
+  }
+};
+
 const updateDay = async (req, res) => {
   try {
     const { id } = req.params;
@@ -198,6 +220,7 @@ export {
   getAllDays,
   getDayById,
   getDayByDate,
+  getActiveMonths,
   updateDay,
   deleteDay,
   deleteDayByDate,
