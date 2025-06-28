@@ -9,6 +9,7 @@ const daySchema = new Schema({
   isVerified: { type: Boolean, default: false },
   verifiedAt: { type: Date },
   isFrozen: { type: Boolean, default: false },
+  ignoreFrozenCheck: { type: Boolean, default: false },
   shopId: { type: Number, ref: "Shop", required: true },
 });
 

@@ -82,21 +82,30 @@ export const getTransactionRecordsByShopId = async (req, res) => {
 export const getUserwiseTransactionSummary = async (req, res) => {
   try {
     const { shopId } = req.params;
+    const { userId } = req.query;
 
     if (!shopId) {
       return sendError(
         res,
-        { message: "Missing shopId in query" },
+        { message: "Missing shopId in params" },
         "Missing shopId",
         400
       );
     }
 
     const result = await transactionService.getUserwiseTransactionSummary(
-      Number(shopId)
+      Number(shopId),
+      userId ? Number(userId) : null
     );
 
-    sendSuccess(res, result, "User-wise transaction summary fetched", 200);
+    sendSuccess(
+      res,
+      result,
+      userId
+        ? `Transactions for user ${userId} fetched successfully`
+        : "User-wise transaction summary fetched",
+      200
+    );
   } catch (err) {
     logger.error(
       `[transaction.controller.js] [getUserwiseTransactionSummary] - ${err.message}`
@@ -104,7 +113,7 @@ export const getUserwiseTransactionSummary = async (req, res) => {
     sendError(
       res,
       { message: err.message },
-      "Failed to fetch user-wise transaction summary",
+      "Failed to fetch transaction summary",
       err.status || 500
     );
   }

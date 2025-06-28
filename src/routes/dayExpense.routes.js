@@ -5,6 +5,7 @@ const router = express.Router();
 
 router.get("/", dayExpenseController.getAllDayExpenses);
 router.get("/:date", dayExpenseController.getDayExpenseByMonth);
+router.get("/summary/:expenseId/:month",dayExpenseController.getMonthlyExpenseDetails);
 
 router.post("/", dayExpenseController.createDayExpense);
 router.put("/:id", dayExpenseController.updateDayExpense);

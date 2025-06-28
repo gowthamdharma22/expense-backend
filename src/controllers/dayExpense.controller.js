@@ -13,7 +13,7 @@ const createDayExpense = async (req, res) => {
     if (!day) {
       return sendError(res, { message: "Day not found" }, "Invalid Day", 404);
     }
-    if (day.isFrozen) {
+    if (!day.ignoreFrozenCheck && day.isFrozen) {
       return sendError(
         res,
         { message: "Day is frozen" },
@@ -133,6 +133,40 @@ const getDayExpenseByMonth = async (req, res) => {
   }
 };
 
+export const  getMonthlyExpenseDetails = async (req, res) => {
+  try {
+    const { shopId } = req.query;
+    const { month, expenseId } = req.params;
+
+    if (!shopId || !month || !expenseId) {
+      return sendError(
+        res,
+        { message: "Missing parameters" },
+        "Bad Request",
+        400
+      );
+    }
+
+    const result = await DayExpenseService.getMonthlyExpenseDetails(
+      Number(shopId),
+      Number(expenseId),
+      month
+    );
+
+    sendSuccess(res, result, "Fetched monthly expense details", 200);
+  } catch (err) {
+    logger.error(
+      `[dayExpense.controller.js] [getMonthlyExpenseDetails] - ${err.message}`
+    );
+    sendError(
+      res,
+      { message: err.message },
+      "Failed to fetch expense details",
+      500
+    );
+  }
+};
+
 const updateDayExpense = async (req, res) => {
   try {
     const { id } = req.params;
@@ -155,7 +189,7 @@ const updateDayExpense = async (req, res) => {
       return sendError(res, { message: "Day not found" }, "Invalid Day", 404);
     }
 
-    if (day.isFrozen) {
+    if (!day.ignoreFrozenCheck && day.isFrozen) {
       return sendError(
         res,
         { message: "Day is frozen" },

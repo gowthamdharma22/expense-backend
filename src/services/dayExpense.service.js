@@ -142,6 +142,12 @@ export const getDayExpenseForMonth = async (monthStr, shopId) => {
     const start = parsedMonth.startOf("month").toDate();
     const end = parsedMonth.endOf("month").toDate();
 
+    const shop = await Shop.findOne({ id: shopId }).lean();
+    if (!shop) throw new Error("Shop not found");
+
+    const allowedEditDays = shop.allowedEditDays || 0;
+    const today = dayjs().startOf("day");
+
     const days = await Days.find({
       shopId,
       date: { $gte: start, $lte: end },
@@ -151,6 +157,20 @@ export const getDayExpenseForMonth = async (monthStr, shopId) => {
 
     const results = await Promise.all(
       days.map(async (day) => {
+        const diff = today.diff(dayjs(day.date).startOf("day"), "day");
+
+        if (!day.ignoreFrozenCheck && diff > allowedEditDays && !day.isFrozen) {
+          await Days.updateOne({ id: day.id }, { isFrozen: true });
+          day.isFrozen = true;
+        } else if (
+          !day.ignoreFrozenCheck &&
+          diff <= allowedEditDays &&
+          day.isFrozen
+        ) {
+          await Days.updateOne({ id: day.id }, { isFrozen: false });
+          day.isFrozen = false;
+        }
+
         const dayExpenses = await DayExpense.find({
           dayId: day.id,
         }).lean();
@@ -274,6 +294,61 @@ export const getDayExpenseByDate = async (dateStr, shopId) => {
       `[dayExpense.service.js] [getDayExpenseByDate] - Error: ${err.message}`
     );
     throw new Error("Error fetching day expense by date: " + err.message);
+  }
+};
+
+export const getMonthlyExpenseDetails = async (shopId, expenseId, monthStr) => {
+  try {
+    const parsedMonth = dayjs(monthStr, "YYYY-MM", true);
+    if (!parsedMonth.isValid()) {
+      throw new Error("Invalid month format. Use YYYY-MM");
+    }
+
+    const start = parsedMonth.startOf("month").toDate();
+    const end = parsedMonth.endOf("month").toDate();
+
+    const days = await Days.find({
+      shopId,
+      date: { $gte: start, $lte: end },
+    }).lean();
+
+    if (!days.length) return [];
+
+    const dayIdMap = new Map();
+    for (const d of days) {
+      dayIdMap.set(d.id, dayjs(d.date).format("YYYY-MM-DD"));
+    }
+
+    const dayIds = [...dayIdMap.keys()];
+
+    const expenses = await DayExpense.find({
+      dayId: { $in: dayIds },
+      expenseId: Number(expenseId),
+      amount: { $gt: 0 },
+    }).lean();
+
+    if (!expenses.length) return [];
+
+    const expenseDetail = await Expense.findOne({
+      id: Number(expenseId),
+    }).lean();
+    if (!expenseDetail) {
+      throw new Error("Expense not found");
+    }
+
+    const summary = expenses.map((exp) => ({
+      date: dayIdMap.get(exp.dayId),
+      expense: expenseDetail.name,
+      type: expenseDetail.type,
+      amount: exp.amount,
+      description: exp.description || "",
+    }));
+
+    summary.sort((a, b) => (dayjs(a.date).isBefore(dayjs(b.date)) ? -1 : 1));
+
+    return summary;
+  } catch (err) {
+    throw new Error(`[getMonthlyExpenseDetails] Error: ${err.message}`);
   }
 };
 
