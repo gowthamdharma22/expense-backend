@@ -8,6 +8,7 @@ import WholeSaleTransaction from "../models/WholeSaleTransaction.js";
 import RetailTransaction from "../models/RetailTransaction.js";
 import * as DayExpenseService from "./dayExpense.service.js";
 import TemplateExpenseBridge from "../models/TemplateExpenseBridge.js";
+import Expense from "../models/Expense.js";
 dayjs.extend(utc);
 
 const getAllDays = async (shopId) => {
@@ -26,10 +27,14 @@ const getAllDays = async (shopId) => {
 
     for (const day of days) {
       const diff = today.diff(dayjs(day.date).utc().startOf("day"), "day");
-      if (diff > allowedEditDays && !day.isFrozen) {
+      if (!day.ignoreFrozenCheck && diff > allowedEditDays && !day.isFrozen) {
         day.isFrozen = true;
         await day.save();
-      } else if (diff <= allowedEditDays && day.isFrozen) {
+      } else if (
+        !day.ignoreFrozenCheck &&
+        diff <= allowedEditDays &&
+        day.isFrozen
+      ) {
         day.isFrozen = false;
         await day.save();
       }
@@ -66,10 +71,14 @@ const getDayById = async (dayId) => {
 
     const diff = today.diff(dayjs(day.date).utc().startOf("day"), "day");
 
-    if (diff > allowedEditDays && !day.isFrozen) {
+    if (!day.ignoreFrozenCheck && diff > allowedEditDays && !day.isFrozen) {
       day.isFrozen = true;
       await day.save();
-    } else if (diff <= allowedEditDays && day.isFrozen) {
+    } else if (
+      !day.ignoreFrozenCheck &&
+      diff <= allowedEditDays &&
+      day.isFrozen
+    ) {
       day.isFrozen = false;
       await day.save();
     }
@@ -124,10 +133,14 @@ const getDayByDate = async (dateStr, shopId) => {
     for (const day of days) {
       const diff = today.diff(dayjs(day.date).utc().startOf("day"), "day");
 
-      if (diff > allowedEditDays && !day.isFrozen) {
+      if (!day.ignoreFrozenCheck && diff > allowedEditDays && !day.isFrozen) {
         day.isFrozen = true;
         await day.save();
-      } else if (diff <= allowedEditDays && day.isFrozen) {
+      } else if (
+        !day.ignoreFrozenCheck &&
+        diff <= allowedEditDays &&
+        day.isFrozen
+      ) {
         day.isFrozen = false;
         await day.save();
       }
@@ -141,6 +154,80 @@ const getDayByDate = async (dateStr, shopId) => {
   } catch (err) {
     logger.error(`[day.service.js] [getDayByDate] - Error: ${err.message}`);
     throw new Error("Error fetching day by date: " + err.message);
+  }
+};
+
+const getMonthlyExpenseSummary = async (shopId, monthStr) => {
+  try {
+    const parsedMonth = dayjs(monthStr, "YYYY-MM", true);
+    if (!parsedMonth.isValid()) {
+      throw new Error("Invalid month format. Use YYYY-MM");
+    }
+
+    const start = parsedMonth.startOf("month").toDate();
+    const end = parsedMonth.endOf("month").toDate();
+
+    const days = await Days.find({
+      shopId,
+      date: { $gte: start, $lte: end },
+    }).lean();
+
+    if (!days.length) return [];
+
+    const dayIds = days.map((d) => d.id);
+
+    const allExpenses = await DayExpenses.find({
+      dayId: { $in: dayIds },
+    }).lean();
+
+    if (!allExpenses.length) return [];
+
+    const summaryMap = new Map();
+
+    for (const exp of allExpenses) {
+      if (!exp.expenseId || !exp.amount || exp.amount <= 0) continue;
+
+      if (!summaryMap.has(exp.expenseId)) {
+        summaryMap.set(exp.expenseId, {
+          totalAmount: 0,
+          usedDays: new Set(),
+        });
+      }
+
+      const current = summaryMap.get(exp.expenseId);
+      current.totalAmount += exp.amount;
+      current.usedDays.add(exp.dayId);
+    }
+
+    const expenseIds = [...summaryMap.keys()];
+    const expenseDetails = await Expense.find({
+      id: { $in: expenseIds },
+    }).lean();
+
+    const enrichedSummary = expenseDetails.map((exp) => {
+      const summary = summaryMap.get(exp.id);
+      return {
+        expenseId: exp.id,
+        expenseName: exp.name,
+        type: exp.type,
+        totalAmount: summary.totalAmount,
+        daysUsed: summary.usedDays.size,
+      };
+    });
+
+    enrichedSummary.sort((a, b) =>
+      a.expenseName.toLowerCase().localeCompare(b.expenseName.toLowerCase())
+    );
+    
+    const totalAmount = Object.values(enrichedSummary).reduce((sum, val) => {
+      return sum + val.totalAmount;
+    }, 0);
+
+    return { summary: enrichedSummary, totalAmount };
+  } catch (err) {
+    throw new Error(
+      `[getMonthlyExpenseSummary] Error: ${err.message || "Unknown error"}`
+    );
   }
 };
 
@@ -324,7 +411,7 @@ const updateDay = async (id, data, isAdmin = false) => {
       throw error;
     }
 
-    if (day.isFrozen) {
+    if (!day.ignoreFrozenCheck && day.isFrozen) {
       throw new Error("This day is frozen and cannot be edited.");
     }
 
@@ -371,13 +458,32 @@ const deleteDay = async (id) => {
   }
 };
 
+const toggleIgnoreFrozen = async (id, status) => {
+  const day = await Days.findOne({ id });
+  if (!day) {
+    const error = new Error("Day not found");
+    error.status = 404;
+    throw error;
+  }
+
+  const freeze = Boolean(status);
+
+  day.ignoreFrozenCheck = freeze;
+  day.isFrozen = false;
+  await day.save();
+
+  return day;
+};
+
 export {
   getAllDays,
   getDayByDate,
   getActiveMonths,
   getDayById,
+  getMonthlyExpenseSummary,
   createDay,
   updateDay,
   deleteDay,
   deleteDayByDate,
+  toggleIgnoreFrozen,
 };

@@ -22,7 +22,7 @@ const dayExpenseSchema = new Schema(
       required: true,
     },
     amount: { type: Number, required: true },
-    description: { type: String },
+    description: { type: String, default: "" },
     isVerified: { type: Boolean, default: false },
     verifiedAt: { type: Date },
   },

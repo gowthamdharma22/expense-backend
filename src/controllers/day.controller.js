@@ -1,6 +1,6 @@
 import logger from "../utils/logger.js";
 import * as DayService from "../services/day.service.js";
-import { sendSuccess, sendError } from "../utils/responseHandler.js";
+import { sendSuccess, sendError, cleanData } from "../utils/responseHandler.js";
 import * as Activity from "../services/activity.service.js";
 
 const createDay = async (req, res) => {
@@ -93,6 +93,49 @@ const getDayByDate = async (req, res) => {
       { message: err.message },
       "Failed to fetch day",
       err.status || 500
+    );
+  }
+};
+
+const getMonthExpenseSummary = async (req, res) => {
+  try {
+    const { shopId } = req.query;
+    const { month } = req.params;
+
+    if (!shopId || !month) {
+      return sendError(
+        res,
+        { message: "shopId and month required" },
+        "Bad Request",
+        400
+      );
+    }
+
+    const summary = await DayService.getMonthlyExpenseSummary(
+      Number(shopId),
+      month
+    );
+
+    sendSuccess(
+      res,
+      {
+        month,
+        shopId: Number(shopId),
+        summary: summary.summary,
+        totalAmount: summary.totalAmount,
+      },
+      "Monthly summary fetched",
+      200
+    );
+  } catch (err) {
+    logger.error(
+      `[day.controller.js] [getMonthExpenseSummary] - ${err.message}`
+    );
+    sendError(
+      res,
+      { message: err.message },
+      "Failed to fetch monthly summary",
+      500
     );
   }
 };
@@ -215,13 +258,48 @@ const deleteDayByDate = async (req, res) => {
   }
 };
 
+const toggleIgnoreFrozenCheck = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  try {
+    if (req.user?.role !== "admin") {
+      return sendError(res, { message: "Unauthorized" }, "Access Denied", 403);
+    }
+
+    const updatedDay = await DayService.toggleIgnoreFrozen(
+      Number(id),
+      Boolean(status)
+    );
+
+    sendSuccess(
+      res,
+      updatedDay,
+      `ignoreFrozenCheck has been ${status ? "enabled" : "disabled"}`,
+      200
+    );
+  } catch (err) {
+    logger.error(
+      `[day.controller.js] [toggleIgnoreFrozenCheck] - ${err.message}`
+    );
+    sendError(
+      res,
+      { message: err.message },
+      "Failed to update ignoreFrozenCheck",
+      err.status || 500
+    );
+  }
+};
+
 export {
   createDay,
   getAllDays,
   getDayById,
   getDayByDate,
+  getMonthExpenseSummary,
   getActiveMonths,
   updateDay,
   deleteDay,
   deleteDayByDate,
+  toggleIgnoreFrozenCheck,
 };

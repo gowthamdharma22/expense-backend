@@ -110,37 +110,56 @@ export const getTransactionsByShopId = async ({ shopId, month, day }) => {
   }
 };
 
-export const getUserwiseTransactionSummary = async (shopId) => {
+export const getUserwiseTransactionSummary = async (shopId, userId = null) => {
   const shop = await Shop.findOne({ id: shopId }).lean();
   if (!shop) throw new Error("Shop not found");
 
   const Model =
     shop.shopType === "wholesale" ? WholesaleTransaction : RetailTransaction;
 
-  const transactions = await Model.find({
-    shopId,
-    userId: { $ne: null },
-  }).lean();
+  const query = { shopId };
+  if (userId) {
+    query.userId = userId;
+  } else {
+    query.userId = { $ne: null };
+  }
+
+  const transactions = await Model.find(query).lean();
+
+  if (userId) {
+    const user = await CreditDebitUser.findOne({ id: userId }).lean();
+    if (!user) throw new Error("User not found");
+
+    return transactions
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .map((txn) => ({
+        date: txn.createdAt,
+        name: user.name,
+        type: txn.type,
+        amount: txn.amount,
+        description: txn.description || "",
+      }));
+  }
 
   const summaryMap = {};
 
   for (const txn of transactions) {
-    const userId = txn.userId;
-    if (!summaryMap[userId]) {
-      summaryMap[userId] = { totalCredit: 0, totalDebit: 0 };
+    const uId = txn.userId;
+    if (!summaryMap[uId]) {
+      summaryMap[uId] = { totalCredit: 0, totalDebit: 0 };
     }
 
     if (txn.type === "credit") {
-      summaryMap[userId].totalCredit += txn.amount;
+      summaryMap[uId].totalCredit += txn.amount;
     } else if (txn.type === "debit") {
-      summaryMap[userId].totalDebit += txn.amount;
+      summaryMap[uId].totalDebit += txn.amount;
     }
   }
 
   const userIds = Object.keys(summaryMap).map((id) => Number(id));
   const users = await CreditDebitUser.find({ id: { $in: userIds } }).lean();
 
-  const result = users.map((user) => {
+  return users.map((user) => {
     const data = summaryMap[user.id] || { totalCredit: 0, totalDebit: 0 };
     return {
       userId: user.id,
@@ -151,6 +170,4 @@ export const getUserwiseTransactionSummary = async (shopId) => {
       balanceAmount: data.totalCredit - data.totalDebit,
     };
   });
-
-  return result;
 };
