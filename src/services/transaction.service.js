@@ -38,136 +38,110 @@ export const recordTransaction = async ({
   }
 };
 
-export const getTransactionsByShopId = async ({ shopId, month, day }) => {
+export const getMonthlyTransactionSummary = async (
+  shopId,
+  monthStr = null,
+  userId = null
+) => {
   try {
-    const shop = await Shop.findOne({ id: shopId });
-    if (!shop) {
-      throw new Error("Shop not found");
-    }
+    const shop = await Shop.findOne({ id: shopId }).lean();
+    if (!shop) throw new Error("Shop not found");
 
-    const shopType = shop.shopType;
     const Model =
-      shopType === "wholesale" ? WholesaleTransaction : RetailTransaction;
+      shop.shopType === "wholesale" ? WholesaleTransaction : RetailTransaction;
 
-    const query = { shopId };
+    const query = {
+      shopId,
+      userId: userId ? Number(userId) : { $ne: null },
+    };
 
-    if (day) {
-      const parsedDay = dayjs(day, "YYYY-MM-DD", true);
-      if (!parsedDay.isValid()) {
-        throw new Error("Invalid day format. Expected YYYY-MM-DD.");
-      }
-
-      const start = parsedDay.startOf("day").toDate();
-      const end = parsedDay.endOf("day").toDate();
-      query.createdAt = { $gte: start, $lte: end };
-    } else if (month) {
-      const parsedMonth = dayjs(month, "YYYY-MM", true);
+    if (monthStr) {
+      const parsedMonth = dayjs(monthStr, "YYYY-MM", true);
       if (!parsedMonth.isValid()) {
-        throw new Error("Invalid month format. Expected YYYY-MM.");
+        throw new Error("Invalid month format. Use YYYY-MM");
       }
-
       const start = parsedMonth.startOf("month").toDate();
       const end = parsedMonth.endOf("month").toDate();
       query.createdAt = { $gte: start, $lte: end };
     }
 
-    const records = await Model.find(query)
-      .sort({ createdAt: -1 })
-      .populate("userId", "id name phone")
+    const transactions = await Model.find(query).lean();
+    if (!transactions.length) return { summary: [], totalAmount: 0 };
+
+    const userIds = [
+      ...new Set(transactions.map((t) => t.userId).filter((id) => id != null)),
+    ];
+
+    const users = await CreditDebitUser.find({ id: { $in: userIds } })
+      .select("id name phone")
       .lean();
 
-    const credit = records
-      .filter((r) => r.type === "credit")
-      .reduce((sum, r) => sum + r.amount, 0);
+    const userMap = {};
+    for (const user of users) {
+      userMap[user.id] = user;
+    }
 
-    const debit = records
-      .filter((r) => r.type === "debit")
-      .reduce((sum, r) => sum + r.amount, 0);
+    if (userId) {
+      const details = transactions
+        .filter((txn) => txn.amount > 0)
+        .map((txn) => ({
+          date: dayjs(txn.createdAt).format("YYYY-MM-DD"),
+          name: userMap[txn.userId]?.name || "Unknown",
+          type: txn.type,
+          amount: txn.amount,
+          description: txn.description || null,
+        }));
 
-    const pendingAmount = credit - debit;
+      return {
+        summary: details,
+        totalAmount: details.reduce((sum, txn) => sum + txn.amount, 0),
+      };
+    }
 
-    const formattedRecords = records.map((r) => ({
-      ...r,
-      user: r.userId
-        ? {
-            id: r.userId.id,
-            name: r.userId.name,
-            phone: r.userId.phone || null,
-          }
-        : null,
+    const grouped = {};
+
+    for (const txn of transactions) {
+      const uid = txn.userId;
+      if (!grouped[uid]) {
+        grouped[uid] = {
+          userId: uid,
+          name: userMap[uid]?.name || "Unknown",
+          phone: userMap[uid]?.phone || null,
+          totalCredit: 0,
+          totalDebit: 0,
+          records: [],
+        };
+      }
+
+      if (txn.type === "credit") grouped[uid].totalCredit += txn.amount;
+      else if (txn.type === "debit") grouped[uid].totalDebit += txn.amount;
+
+      grouped[uid].records.push({
+        date: dayjs(txn.createdAt).format("YYYY-MM-DD"),
+        type: txn.type,
+        amount: txn.amount,
+        description: txn.description || null,
+      });
+    }
+
+    const summary = Object.values(grouped).map((entry) => ({
+      ...entry,
+      balanceAmount: entry.totalCredit - entry.totalDebit,
     }));
 
+    const totalAmount = summary.reduce(
+      (sum, user) => sum + user.balanceAmount,
+      0
+    );
+
     return {
-      records: formattedRecords,
-      pendingAmount,
-      shopType,
+      summary,
+      totalAmount,
     };
   } catch (err) {
     logger.error(
-      `[transaction.service.js] [getTransactionsByShopId] - ${err.message}`
+      `[transaction.service.js] [getMonthlyTransactionSummary] - ${err.message}`
     );
-    throw new Error(err.message || "Transaction lookup failed");
+    throw new Error(`Error in getMonthlyTransactionSummary: ${err.message}`);
   }
-};
-
-export const getUserwiseTransactionSummary = async (shopId, userId = null) => {
-  const shop = await Shop.findOne({ id: shopId }).lean();
-  if (!shop) throw new Error("Shop not found");
-
-  const Model =
-    shop.shopType === "wholesale" ? WholesaleTransaction : RetailTransaction;
-
-  const query = { shopId };
-  if (userId) {
-    query.userId = userId;
-  } else {
-    query.userId = { $ne: null };
-  }
-
-  const transactions = await Model.find(query).lean();
-
-  if (userId) {
-    const user = await CreditDebitUser.findOne({ id: userId }).lean();
-    if (!user) throw new Error("User not found");
-
-    return transactions
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .map((txn) => ({
-        date: txn.createdAt,
-        name: user.name,
-        type: txn.type,
-        amount: txn.amount,
-        description: txn.description || "",
-      }));
-  }
-
-  const summaryMap = {};
-
-  for (const txn of transactions) {
-    const uId = txn.userId;
-    if (!summaryMap[uId]) {
-      summaryMap[uId] = { totalCredit: 0, totalDebit: 0 };
-    }
-
-    if (txn.type === "credit") {
-      summaryMap[uId].totalCredit += txn.amount;
-    } else if (txn.type === "debit") {
-      summaryMap[uId].totalDebit += txn.amount;
-    }
-  }
-
-  const userIds = Object.keys(summaryMap).map((id) => Number(id));
-  const users = await CreditDebitUser.find({ id: { $in: userIds } }).lean();
-
-  return users.map((user) => {
-    const data = summaryMap[user.id] || { totalCredit: 0, totalDebit: 0 };
-    return {
-      userId: user.id,
-      name: user.name,
-      phone: user.phone || null,
-      totalCredit: data.totalCredit,
-      totalDebit: data.totalDebit,
-      balanceAmount: data.totalCredit - data.totalDebit,
-    };
-  });
 };

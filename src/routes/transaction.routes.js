@@ -4,7 +4,9 @@ import * as transactionController from "../controllers/transaction.controller.js
 const router = express.Router();
 
 router.post("/adjust", transactionController.adjustTransaction);
-router.get("/:shopId", transactionController.getTransactionRecordsByShopId);
-router.get("/notes/:shopId", transactionController.getUserwiseTransactionSummary);
+router.get(
+  "/notes/:shopId",
+  transactionController.getTransactionRecordsByShopId
+);
 
 export default router;

@@ -46,24 +46,14 @@ export const adjustTransaction = async (req, res) => {
 export const getTransactionRecordsByShopId = async (req, res) => {
   try {
     const { shopId } = req.params;
-    const { filter } = req.query;
+    const { month } = req.query;
+    const { userId } = req.query;
 
-    let month = null;
-    let day = null;
-
-    if (filter) {
-      if (/^\d{4}-\d{1,2}-\d{2}$/.test(filter)) {
-        day = filter;
-      } else if (/^\d{4}-\d{1,2}$/.test(filter)) {
-        month = filter;
-      }
-    }
-
-    const result = await transactionService.getTransactionsByShopId({
-      shopId: Number(shopId),
+    const result = await transactionService.getMonthlyTransactionSummary(
+      Number(shopId),
       month,
-      day,
-    });
+      Number(userId)
+    );
 
     sendSuccess(res, result, "Transaction records fetched successfully", 200);
   } catch (err) {
@@ -79,42 +69,3 @@ export const getTransactionRecordsByShopId = async (req, res) => {
   }
 };
 
-export const getUserwiseTransactionSummary = async (req, res) => {
-  try {
-    const { shopId } = req.params;
-    const { userId } = req.query;
-
-    if (!shopId) {
-      return sendError(
-        res,
-        { message: "Missing shopId in params" },
-        "Missing shopId",
-        400
-      );
-    }
-
-    const result = await transactionService.getUserwiseTransactionSummary(
-      Number(shopId),
-      userId ? Number(userId) : null
-    );
-
-    sendSuccess(
-      res,
-      result,
-      userId
-        ? `Transactions for user ${userId} fetched successfully`
-        : "User-wise transaction summary fetched",
-      200
-    );
-  } catch (err) {
-    logger.error(
-      `[transaction.controller.js] [getUserwiseTransactionSummary] - ${err.message}`
-    );
-    sendError(
-      res,
-      { message: err.message },
-      "Failed to fetch transaction summary",
-      err.status || 500
-    );
-  }
-};
