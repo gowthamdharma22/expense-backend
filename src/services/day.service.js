@@ -215,11 +215,22 @@ const getMonthlyExpenseSummary = async (shopId, monthStr) => {
       };
     });
 
-    enrichedSummary.sort((a, b) =>
-      a.expenseName.toLowerCase().localeCompare(b.expenseName.toLowerCase())
-    );
-    
-    const totalAmount = Object.values(enrichedSummary).reduce((sum, val) => {
+    enrichedSummary.sort((a, b) => {
+      // First priority: isDefault true (excluding ID 1 & 2)
+      if (a.isDefault && ![1, 2].includes(a.expenseId) && !(b.isDefault && ![1, 2].includes(b.expenseId))) return -1;
+      if (b.isDefault && ![1, 2].includes(b.expenseId) && !(a.isDefault && ![1, 2].includes(a.expenseId))) return 1;
+
+      // Second priority: non-default expenses
+      if (!a.isDefault && ![1, 2].includes(a.expenseId) && (b.isDefault && ![1, 2].includes(b.expenseId))) return 1;
+      if (!b.isDefault && ![1, 2].includes(b.expenseId) && (a.isDefault && ![1, 2].includes(a.expenseId))) return -1;
+
+      // Third priority: id 1 and 2 last
+      if ([1, 2].includes(a.expenseId) && ![1, 2].includes(b.expenseId)) return 1;
+      if ([1, 2].includes(b.expenseId) && ![1, 2].includes(a.expenseId)) return -1;
+
+    });
+
+    const totalAmount = enrichedSummary.reduce((sum, val) => {
       return sum + val.totalAmount;
     }, 0);
 
@@ -230,6 +241,7 @@ const getMonthlyExpenseSummary = async (shopId, monthStr) => {
     );
   }
 };
+
 
 const getActiveMonths = async (shopId) => {
   try {
