@@ -114,7 +114,7 @@ export const ensureDaysForMonth = async (monthStr, shopId) => {
 
     for (let day = 1; day <= daysInMonth; day++) {
       const currentDate = parsedMonth.date(day);
-      
+
       if (currentDate.toDate() > today.toDate()) continue;
 
       const formattedDate = currentDate.format("YYYY-MM-DD");
@@ -451,6 +451,26 @@ export const updateDayExpense = async (id, data) => {
       const error = new Error("DayExpense not found");
       error.status = 404;
       throw error;
+    }
+
+    if ([1, 2].includes(updated.expenseId) && data.userId) {
+      const dayExpenseId = updated.id;
+
+      const day = await Days.findOne({ id: updated.dayId });
+      if (day) {
+        const shop = await Shop.findOne({ id: day.shopId });
+        if (shop) {
+          const TransactionModel =
+            shop.shopType === "wholesale"
+              ? WholeSaleTransaction
+              : RetailTransaction;
+
+          await TransactionModel.updateOne(
+            { dayExpenseId },
+            { userId: data.userId }
+          );
+        }
+      }
     }
 
     logger.info(
