@@ -22,14 +22,14 @@ app.use(json());
 
 app.get("/api", (_, res) => res.send("Hello from Expense Tracker API"));
 app.use("/api/auth", authRoutes);
-app.use("/api/expense", protect, admin, expenseRoutes);
+app.use("/api/expense", protect, expenseRoutes);
 app.use("/api/template", protect, admin, templateRoutes);
 app.use("/api/shop", protect, shopRoutes);
 app.use("/api/day", protect, dayRoutes);
 app.use("/api/day-expense", protect, dayExpenseRoutes);
 app.use("/api/activity", protect, activityRoute);
-app.use("/api/transaction", protect, admin, transactionRoutes);
-app.use("/api/notes/user", protect, admin, creditDebitUserRoutes);
+app.use("/api/transaction", protect, transactionRoutes);
+app.use("/api/notes/user", protect, creditDebitUserRoutes);
 
 const PORT = process.env.PORT || 5000;
 
