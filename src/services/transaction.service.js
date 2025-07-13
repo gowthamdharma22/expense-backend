@@ -4,6 +4,7 @@ import CreditDebitUser from "../models/CreditDebitUser.js";
 import logger from "../utils/logger.js";
 import Shop from "../models/Shop.js";
 import dayjs from "dayjs";
+
 export const recordTransaction = async ({
   shopType,
   shopId,
@@ -12,18 +13,23 @@ export const recordTransaction = async ({
   description,
   dayExpenseId = 0,
   userId,
-  isAdjustment = false,
 }) => {
   try {
+    if ((type === "credit" || type === "debit") && !userId) {
+      throw new Error("userId is required for credit or debit transactions.");
+    }
+
     const data = {
       shopId,
       amount,
       type,
       description,
       dayExpenseId,
-      userId,
-      isAdjustment,
     };
+
+    if (userId) {
+      data.userId = userId;
+    }
 
     if (shopType === "wholesale") {
       return await WholesaleTransaction.create(data);
@@ -50,58 +56,84 @@ export const getMonthlyTransactionSummary = async (
     const Model =
       shop.shopType === "wholesale" ? WholesaleTransaction : RetailTransaction;
 
-    const query = {
-      shopId,
-      userId: userId ? Number(userId) : { $ne: null },
-    };
+    const baseQuery = { shopId };
 
     if (monthStr) {
       const parsedMonth = dayjs(monthStr, "YYYY-MM", true);
       if (!parsedMonth.isValid()) {
         throw new Error("Invalid month format. Use YYYY-MM");
       }
-      const start = parsedMonth.startOf("month").toDate();
-      const end = parsedMonth.endOf("month").toDate();
-      query.createdAt = { $gte: start, $lte: end };
+      baseQuery.createdAt = {
+        $gte: parsedMonth.startOf("month").toDate(),
+        $lte: parsedMonth.endOf("month").toDate(),
+      };
     }
 
-    const transactions = await Model.find(query).lean();
-    if (!transactions.length) return { summary: [], totalAmount: 0 };
+    const transactions = await Model.find(baseQuery).lean();
+    if (!transactions.length)
+      return { summary: [], totalAmount: 0, adjustments: [] };
 
     const userIds = [
-      ...new Set(transactions.map((t) => t.userId).filter((id) => id != null)),
+      ...new Set(
+        transactions
+          .filter((t) => t.userId && t.type !== "adjust")
+          .map((t) => t.userId)
+      ),
     ];
 
     const users = await CreditDebitUser.find({ id: { $in: userIds } })
       .select("id name phone")
       .lean();
 
-    const userMap = {};
-    for (const user of users) {
-      userMap[user.id] = user;
-    }
+    const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
+
+    const adjustments = transactions
+      .filter((t) => t.type === "adjust")
+      .map((t) => ({
+        id: t.id,
+        amount: t.amount,
+        type: "adjust",
+        description: t.description,
+        date: dayjs(t.createdAt).format("YYYY-MM-DD"),
+        isAdjustmentVerified: t.isAdjustmentVerified,
+      }));
 
     if (userId) {
-      const details = transactions
-        .filter((txn) => txn.amount > 0)
-        .map((txn) => ({
-          date: dayjs(txn.createdAt).format("YYYY-MM-DD"),
-          name: userMap[txn.userId]?.name || "Unknown",
-          type: txn.type,
-          amount: txn.amount,
-          description: txn.description || null,
+      const summary = transactions
+        .filter(
+          (t) =>
+            t.userId === Number(userId) && t.type !== "adjust" && t.amount > 0
+        )
+        .map((t) => ({
+          id: t.id,
+          date: dayjs(t.createdAt).format("YYYY-MM-DD"),
+          name: userMap[t.userId]?.name || "Unknown",
+          type: t.type,
+          amount: t.amount,
+          description: t.description || null,
         }));
 
-      return {
-        summary: details,
-        totalAmount: details.reduce((sum, txn) => sum + txn.amount, 0),
-      };
+      const totalCreditDebit = summary.reduce((sum, t) => {
+        return t.type === "debit" ? sum - t.amount : sum + t.amount;
+      }, 0);
+
+      const totalVerifiedAdjustments = adjustments
+        .filter((a) => a.isAdjustmentVerified)
+        .reduce((sum, a) => sum + a.amount, 0);
+
+      const totalAmount = totalCreditDebit + totalVerifiedAdjustments;
+
+      return { summary, totalAmount, adjustments };
     }
 
     const grouped = {};
 
     for (const txn of transactions) {
+      if (txn.type === "adjust") continue;
+
       const uid = txn.userId;
+      if (!uid) continue;
+
       if (!grouped[uid]) {
         grouped[uid] = {
           userId: uid,
@@ -113,15 +145,20 @@ export const getMonthlyTransactionSummary = async (
         };
       }
 
-      if (txn.type === "credit") grouped[uid].totalCredit += txn.amount;
-      else if (txn.type === "debit") grouped[uid].totalDebit += txn.amount;
-
-      grouped[uid].records.push({
+      const entry = {
         date: dayjs(txn.createdAt).format("YYYY-MM-DD"),
         type: txn.type,
         amount: txn.amount,
         description: txn.description || null,
-      });
+      };
+
+      if (txn.type === "credit") {
+        grouped[uid].totalCredit += txn.amount;
+      } else if (txn.type === "debit") {
+        grouped[uid].totalDebit += txn.amount;
+      }
+
+      grouped[uid].records.push(entry);
     }
 
     const summary = Object.values(grouped).map((entry) => ({
@@ -129,19 +166,39 @@ export const getMonthlyTransactionSummary = async (
       balanceAmount: entry.totalCredit - entry.totalDebit,
     }));
 
-    const totalAmount = summary.reduce(
+    const totalCreditDebit = summary.reduce(
       (sum, user) => sum + user.balanceAmount,
       0
     );
 
-    return {
-      summary,
-      totalAmount,
-    };
+    const totalVerifiedAdjustments = adjustments
+      .filter((a) => a.isAdjustmentVerified)
+      .reduce((sum, a) => sum + a.amount, 0);
+
+    const totalAmount = totalCreditDebit + totalVerifiedAdjustments;
+
+    return { summary, totalAmount, adjustments };
   } catch (err) {
     logger.error(
       `[transaction.service.js] [getMonthlyTransactionSummary] - ${err.message}`
     );
     throw new Error(`Error in getMonthlyTransactionSummary: ${err.message}`);
   }
+};
+
+export const verifyAdjustment = async (id, isAdjustmentVerified) => {
+  const txn =
+    (await RetailTransaction.findOne({ id })) ||
+    (await WholesaleTransaction.findOne({ id }));
+
+  if (!txn) throw new Error("Transaction not found");
+
+  if (txn.type !== "adjust") {
+    throw new Error("Only adjustment transactions can be verified");
+  }
+
+  txn.isAdjustmentVerified = isAdjustmentVerified;
+  await txn.save();
+
+  return txn.toObject();
 };

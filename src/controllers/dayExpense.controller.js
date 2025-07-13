@@ -8,12 +8,13 @@ import CreditDebitUser from "../models/CreditDebitUser.js";
 const createDayExpense = async (req, res) => {
   try {
     const { dayId, expenseId, userId } = req.body;
+    const isAdmin = req.user?.role === "admin";
 
     const day = await DayService.getDayById(dayId);
     if (!day) {
       return sendError(res, { message: "Day not found" }, "Invalid Day", 404);
     }
-    if (!day.ignoreFrozenCheck && day.isFrozen) {
+    if (!isAdmin && (!day.ignoreFrozenCheck && day.isFrozen)) {
       return sendError(
         res,
         { message: "Day is frozen" },
@@ -133,7 +134,7 @@ const getDayExpenseByMonth = async (req, res) => {
   }
 };
 
-export const  getMonthlyExpenseDetails = async (req, res) => {
+export const getMonthlyExpenseDetails = async (req, res) => {
   try {
     const { shopId } = req.query;
     const { month, expenseId } = req.params;
@@ -171,6 +172,8 @@ const updateDayExpense = async (req, res) => {
   try {
     const { id } = req.params;
     const { expenseId, userId } = req.body;
+    const isAdmin = req.user?.role === "admin";
+
     const existing = await DayExpenseService.getDayExpenseById(
       id,
       req.body.shopId
@@ -189,7 +192,7 @@ const updateDayExpense = async (req, res) => {
       return sendError(res, { message: "Day not found" }, "Invalid Day", 404);
     }
 
-    if (!day.ignoreFrozenCheck && day.isFrozen) {
+    if (!isAdmin && !day.ignoreFrozenCheck && day.isFrozen) {
       return sendError(
         res,
         { message: "Day is frozen" },

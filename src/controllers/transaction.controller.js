@@ -6,30 +6,30 @@ import Shop from "../models/Shop.js";
 
 export const adjustTransaction = async (req, res) => {
   try {
-    const { shopId, amount, description, type } = req.body;
+    const { shopId, amount, userId, description, type = "adjust" } = req.body;
+
+    if ((type === "credit" || type === "debit") && !userId) {
+      throw new Error("userId is required for credit or debit transactions.");
+    }
 
     const shop = await Shop.findOne({ id: shopId });
     if (!shop) {
       throw new Error("Shop not found");
     }
 
-    const { shopType } = shop;
-
     const result = await transactionService.recordTransaction({
-      shopType,
+      shopType: shop.shopType,
       shopId,
       amount,
       type,
       description,
       dayExpenseId: 0,
-      isAdjustment: true,
+      userId,
     });
 
-    Activity.Logger(
-      { shopId, amount },
-      `Manual Adjustment recorded: ₹${amount}`
-    );
-    sendSuccess(res, result, "Adjustment successful", 201);
+    Activity.Logger({ shopId, amount }, `Manual ${type} recorded: ₹${amount}`);
+
+    sendSuccess(res, result, "Transaction recorded successfully", 201);
   } catch (err) {
     logger.error(
       `[transaction.controller.js] [adjustTransaction] - ${err.message}`
@@ -37,7 +37,7 @@ export const adjustTransaction = async (req, res) => {
     sendError(
       res,
       { message: err.message },
-      "Adjustment failed",
+      "Transaction failed",
       err.status || 500
     );
   }
@@ -69,3 +69,26 @@ export const getTransactionRecordsByShopId = async (req, res) => {
   }
 };
 
+export const verifyAdjustment = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { isAdjustmentVerified } = req.body;
+
+    if (typeof isAdjustmentVerified !== "boolean") {
+      return res
+        .status(400)
+        .json({ message: "isAdjustmentVerified must be a boolean" });
+    }
+
+    const result = await transactionService.verifyAdjustment(
+      id,
+      isAdjustmentVerified
+    );
+
+    res
+      .status(200)
+      .json({ message: "Adjustment verification updated", data: result });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Server error" });
+  }
+};

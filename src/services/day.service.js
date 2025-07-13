@@ -493,7 +493,7 @@ const updateDay = async (id, data, isAdmin = false) => {
       throw error;
     }
 
-    if (!day.ignoreFrozenCheck && day.isFrozen) {
+    if (!isAdmin && !day.ignoreFrozenCheck && day.isFrozen) {
       throw new Error("This day is frozen and cannot be edited.");
     }
 

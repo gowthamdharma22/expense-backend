@@ -9,5 +9,10 @@ router.get(
   "/notes/:shopId",
   transactionController.getTransactionRecordsByShopId
 );
+router.patch(
+  "/verify/:id",
+  admin,
+  transactionController.verifyAdjustment
+);
 
 export default router;
