@@ -52,7 +52,7 @@ const loginUser = async ({ email, password }) => {
   logger.info(`[auth.service.js] [loginUser] - User logged in: ${email}`);
   return {
     message: "Login successful",
-    user: { id: user._id, email: user.email, role: user.role },
+    user: { id: user._id, name: user.name, email: user.email, role: user.role },
     token,
   };
 };
