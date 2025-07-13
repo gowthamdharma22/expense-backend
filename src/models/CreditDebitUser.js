@@ -26,4 +26,24 @@ creditDebitUserSchema.plugin(autoIncrement, {
   start_seq: 1,
 });
 
-export default model("CreditDebitUser", creditDebitUserSchema);
+creditDebitUserSchema.statics.ensureAdmin = async function () {
+  const exists = await this.findOne({ name:"ADMIN" });
+  if (!exists) {
+    await this.create({
+      name: "ADMIN",
+      phone: "0000000000",
+    });
+    console.log("[creditDebitUser.model.js] Default admin user created.");
+  }
+};
+
+const CreditDebitUser = model("CreditDebitUser", creditDebitUserSchema);
+
+CreditDebitUser.ensureAdmin().catch((err) => {
+  console.error(
+    "[creditDebitUser.model.js] Failed to create default admin:",
+    err.message
+  );
+});
+
+export default CreditDebitUser;

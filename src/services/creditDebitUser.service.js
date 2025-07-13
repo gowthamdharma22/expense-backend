@@ -8,7 +8,11 @@ export const createUser = async (data) => {
 
 export const getAllUsers = async () => {
   const users = await CreditDebitUser.find().sort({ name: 1 }).lean();
-  return cleanData(users);
+  const filteredUsers = users.filter(
+    (user) => user.id !== 1 && user.name.toUpperCase() !== "ADMIN"
+  );
+
+  return cleanData(filteredUsers);
 };
 
 export const getUserById = async (id) => {

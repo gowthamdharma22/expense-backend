@@ -6,30 +6,30 @@ import Shop from "../models/Shop.js";
 
 export const adjustTransaction = async (req, res) => {
   try {
-    const { shopId, amount, description, type } = req.body;
+    const { shopId, amount, userId, description, type = "adjust" } = req.body;
+
+    if ((type === "credit" || type === "debit") && !userId) {
+      throw new Error("userId is required for credit or debit transactions.");
+    }
 
     const shop = await Shop.findOne({ id: shopId });
     if (!shop) {
       throw new Error("Shop not found");
     }
 
-    const { shopType } = shop;
-
     const result = await transactionService.recordTransaction({
-      shopType,
+      shopType: shop.shopType,
       shopId,
       amount,
       type,
       description,
       dayExpenseId: 0,
-      isAdjustment: true,
+      userId,
     });
 
-    Activity.Logger(
-      { shopId, amount },
-      `Manual Adjustment recorded: ₹${amount}`
-    );
-    sendSuccess(res, result, "Adjustment successful", 201);
+    Activity.Logger({ shopId, amount }, `Manual ${type} recorded: ₹${amount}`);
+
+    sendSuccess(res, result, "Transaction recorded successfully", 201);
   } catch (err) {
     logger.error(
       `[transaction.controller.js] [adjustTransaction] - ${err.message}`
@@ -37,7 +37,7 @@ export const adjustTransaction = async (req, res) => {
     sendError(
       res,
       { message: err.message },
-      "Adjustment failed",
+      "Transaction failed",
       err.status || 500
     );
   }
@@ -46,24 +46,14 @@ export const adjustTransaction = async (req, res) => {
 export const getTransactionRecordsByShopId = async (req, res) => {
   try {
     const { shopId } = req.params;
-    const { filter } = req.query;
+    const { month } = req.query;
+    const { userId } = req.query;
 
-    let month = null;
-    let day = null;
-
-    if (filter) {
-      if (/^\d{4}-\d{1,2}-\d{2}$/.test(filter)) {
-        day = filter;
-      } else if (/^\d{4}-\d{1,2}$/.test(filter)) {
-        month = filter;
-      }
-    }
-
-    const result = await transactionService.getTransactionsByShopId({
-      shopId: Number(shopId),
+    const result = await transactionService.getMonthlyTransactionSummary(
+      Number(shopId),
       month,
-      day,
-    });
+      Number(userId)
+    );
 
     sendSuccess(res, result, "Transaction records fetched successfully", 200);
   } catch (err) {
@@ -79,42 +69,26 @@ export const getTransactionRecordsByShopId = async (req, res) => {
   }
 };
 
-export const getUserwiseTransactionSummary = async (req, res) => {
+export const verifyAdjustment = async (req, res) => {
   try {
-    const { shopId } = req.params;
-    const { userId } = req.query;
+    const id = Number(req.params.id);
+    const { isAdjustmentVerified } = req.body;
 
-    if (!shopId) {
-      return sendError(
-        res,
-        { message: "Missing shopId in params" },
-        "Missing shopId",
-        400
-      );
+    if (typeof isAdjustmentVerified !== "boolean") {
+      return res
+        .status(400)
+        .json({ message: "isAdjustmentVerified must be a boolean" });
     }
 
-    const result = await transactionService.getUserwiseTransactionSummary(
-      Number(shopId),
-      userId ? Number(userId) : null
+    const result = await transactionService.verifyAdjustment(
+      id,
+      isAdjustmentVerified
     );
 
-    sendSuccess(
-      res,
-      result,
-      userId
-        ? `Transactions for user ${userId} fetched successfully`
-        : "User-wise transaction summary fetched",
-      200
-    );
-  } catch (err) {
-    logger.error(
-      `[transaction.controller.js] [getUserwiseTransactionSummary] - ${err.message}`
-    );
-    sendError(
-      res,
-      { message: err.message },
-      "Failed to fetch transaction summary",
-      err.status || 500
-    );
+    res
+      .status(200)
+      .json({ message: "Adjustment verification updated", data: result });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Server error" });
   }
 };

@@ -9,6 +9,7 @@ import RetailTransaction from "../models/RetailTransaction.js";
 import * as DayExpenseService from "./dayExpense.service.js";
 import TemplateExpenseBridge from "../models/TemplateExpenseBridge.js";
 import Expense from "../models/Expense.js";
+import CreditDebitUser from "../models/CreditDebitUser.js";
 dayjs.extend(utc);
 
 const getAllDays = async (shopId) => {
@@ -204,24 +205,100 @@ const getMonthlyExpenseSummary = async (shopId, monthStr) => {
       id: { $in: expenseIds },
     }).lean();
 
-    const enrichedSummary = expenseDetails.map((exp) => {
+    const enrichedSummary = [];
+
+    for (const exp of expenseDetails) {
       const summary = summaryMap.get(exp.id);
-      return {
+
+      const enriched = {
         expenseId: exp.id,
         expenseName: exp.name,
         type: exp.type,
         totalAmount: summary.totalAmount,
         daysUsed: summary.usedDays.size,
+        isDefault: exp.isDefault || false,
       };
+
+      if (["credit", "debit"].includes(exp.type) && [1, 2].includes(exp.id)) {
+        const TransactionModel =
+          (await Shop.findOne({ id: shopId }).lean()).shopType === "wholesale"
+            ? WholeSaleTransaction
+            : RetailTransaction;
+
+        const transactions = await TransactionModel.find({
+          shopId,
+          type: exp.type,
+          createdAt: { $gte: start, $lte: end },
+          userId: { $ne: null },
+        }).lean();
+
+        const userMap = new Map();
+
+        for (const txn of transactions) {
+          const uid = txn.userId;
+          if (!userMap.has(uid)) {
+            userMap.set(uid, {
+              totalAmount: 0,
+            });
+          }
+          userMap.get(uid).totalAmount += txn.amount;
+        }
+
+        const userIds = [...userMap.keys()];
+        const users = await CreditDebitUser.find({
+          id: { $in: userIds },
+        }).lean();
+
+        const userSummary = users.map((user) => ({
+          userId: user.id,
+          name: user.name,
+          phone: user.phone || null,
+          amount: userMap.get(user.id)?.totalAmount || 0,
+        }));
+
+        enriched.userDetails = userSummary;
+      }
+
+      enrichedSummary.push(enriched);
+    }
+
+    enrichedSummary.sort((a, b) => {
+      if (
+        a.isDefault &&
+        ![1, 2].includes(a.expenseId) &&
+        !(b.isDefault && ![1, 2].includes(b.expenseId))
+      )
+        return -1;
+      if (
+        b.isDefault &&
+        ![1, 2].includes(b.expenseId) &&
+        !(a.isDefault && ![1, 2].includes(a.expenseId))
+      )
+        return 1;
+      if (
+        !a.isDefault &&
+        ![1, 2].includes(a.expenseId) &&
+        b.isDefault &&
+        ![1, 2].includes(b.expenseId)
+      )
+        return 1;
+      if (
+        !b.isDefault &&
+        ![1, 2].includes(b.expenseId) &&
+        a.isDefault &&
+        ![1, 2].includes(a.expenseId)
+      )
+        return -1;
+      if ([1, 2].includes(a.expenseId) && ![1, 2].includes(b.expenseId))
+        return 1;
+      if ([1, 2].includes(b.expenseId) && ![1, 2].includes(a.expenseId))
+        return -1;
     });
 
-    enrichedSummary.sort((a, b) =>
-      a.expenseName.toLowerCase().localeCompare(b.expenseName.toLowerCase())
+    const totalAmount = enrichedSummary.reduce(
+      (sum, val) => sum + val.totalAmount,
+      0
     );
-    
-    const totalAmount = Object.values(enrichedSummary).reduce((sum, val) => {
-      return sum + val.totalAmount;
-    }, 0);
 
     return { summary: enrichedSummary, totalAmount };
   } catch (err) {
@@ -254,8 +331,13 @@ const getActiveMonths = async (shopId) => {
       }
     }
 
+    const currentMonth = dayjs().format("YYYY-MM");
+    if (!monthsMap.has(currentMonth)) {
+      monthsMap.set(currentMonth, []);
+    }
+
     const result = [...monthsMap.entries()]
-      .sort((a, b) => dayjs(a[0]).isBefore(dayjs(b[0]) ? -1 : 1))
+      .sort((a, b) => (dayjs(a[0]).isBefore(dayjs(b[0])) ? -1 : 1))
       .map(([month, days]) => ({
         month,
         days,
@@ -411,7 +493,7 @@ const updateDay = async (id, data, isAdmin = false) => {
       throw error;
     }
 
-    if (!day.ignoreFrozenCheck && day.isFrozen) {
+    if (!isAdmin && !day.ignoreFrozenCheck && day.isFrozen) {
       throw new Error("This day is frozen and cannot be edited.");
     }
 

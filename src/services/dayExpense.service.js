@@ -8,6 +8,9 @@ import * as TransactionService from "./transaction.service.js";
 import * as DayService from "./day.service.js";
 import Shop from "../models/Shop.js";
 import dayjs from "dayjs";
+import CreditDebitUser from "../models/CreditDebitUser.js";
+import WholeSaleTransaction from "../models/WholeSaleTransaction.js";
+import RetailTransaction from "../models/RetailTransaction.js";
 
 export const getAllDayExpenses = async () => {
   try {
@@ -92,6 +95,7 @@ export const ensureDaysForMonth = async (monthStr, shopId) => {
 
     const startDate = parsedMonth.startOf("month");
     const endDate = parsedMonth.endOf("month");
+    const today = dayjs().startOf("day");
     const daysInMonth = endDate.date();
 
     const existingDays = await Days.find({
@@ -109,15 +113,18 @@ export const ensureDaysForMonth = async (monthStr, shopId) => {
     const createdDates = [];
 
     for (let day = 1; day <= daysInMonth; day++) {
-      const currentDate = parsedMonth.date(day).format("YYYY-MM-DD");
+      const currentDate = parsedMonth.date(day);
 
-      if (!existingDatesSet.has(currentDate)) {
+      if (currentDate.toDate() > today.toDate()) continue;
+
+      const formattedDate = currentDate.format("YYYY-MM-DD");
+      if (!existingDatesSet.has(formattedDate)) {
         await DayService.createDay({
           shopId,
-          date: currentDate,
+          date: formattedDate,
           templateId: shop.templateId,
         });
-        createdDates.push(currentDate);
+        createdDates.push(formattedDate);
       }
     }
 
@@ -148,6 +155,9 @@ export const getDayExpenseForMonth = async (monthStr, shopId) => {
     const allowedEditDays = shop.allowedEditDays || 0;
     const today = dayjs().startOf("day");
 
+    const TransactionModel =
+      shop.shopType === "wholesale" ? WholeSaleTransaction : RetailTransaction;
+
     const days = await Days.find({
       shopId,
       date: { $gte: start, $lte: end },
@@ -171,9 +181,7 @@ export const getDayExpenseForMonth = async (monthStr, shopId) => {
           day.isFrozen = false;
         }
 
-        const dayExpenses = await DayExpense.find({
-          dayId: day.id,
-        }).lean();
+        const dayExpenses = await DayExpense.find({ dayId: day.id }).lean();
 
         let totalCredit = 0;
         let totalDebit = 0;
@@ -186,10 +194,26 @@ export const getDayExpenseForMonth = async (monthStr, shopId) => {
             if (type === "credit") totalCredit += d.amount || 0;
             if (type === "debit") totalDebit += d.amount || 0;
 
+            let user = null;
+
+            if ([1, 2].includes(d.expenseId)) {
+              const txn = await TransactionModel.findOne({
+                dayExpenseId: d.id,
+              }).lean();
+
+              if (txn?.userId) {
+                user = await CreditDebitUser.findOne({ id: txn.userId }).lean();
+              }
+            }
+
             return {
               ...cleanData(d),
               expense: expense
-                ? { ...cleanData(expense), dayExpenseId: d.id }
+                ? {
+                    ...cleanData(expense),
+                    user: user ? cleanData(user) : null,
+                    dayExpenseId: d.id,
+                  }
                 : null,
             };
           })
@@ -427,6 +451,26 @@ export const updateDayExpense = async (id, data) => {
       const error = new Error("DayExpense not found");
       error.status = 404;
       throw error;
+    }
+
+    if ([1, 2].includes(updated.expenseId) && data.userId) {
+      const dayExpenseId = updated.id;
+
+      const day = await Days.findOne({ id: updated.dayId });
+      if (day) {
+        const shop = await Shop.findOne({ id: day.shopId });
+        if (shop) {
+          const TransactionModel =
+            shop.shopType === "wholesale"
+              ? WholeSaleTransaction
+              : RetailTransaction;
+
+          await TransactionModel.updateOne(
+            { dayExpenseId },
+            { userId: data.userId }
+          );
+        }
+      }
     }
 
     logger.info(
