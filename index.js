@@ -24,7 +24,7 @@ app.get("/api", (_, res) => res.send("Hello from Expense Tracker API"));
 app.use("/api/auth", authRoutes);
 app.use("/api/expense", protect, admin, expenseRoutes);
 app.use("/api/template", protect, admin, templateRoutes);
-app.use("/api/shop", protect, admin, shopRoutes);
+app.use("/api/shop", protect, shopRoutes);
 app.use("/api/day", protect, dayRoutes);
 app.use("/api/day-expense", protect, dayExpenseRoutes);
 app.use("/api/activity", protect, activityRoute);
