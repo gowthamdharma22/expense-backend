@@ -17,7 +17,12 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors());
+app.use(
+  cors({
+    origin: [process.env.FE_URL],
+    credentials: true,
+  })
+);
 app.use(json());
 
 app.get("/api", (_, res) => res.send("Hello from Expense Tracker API"));
