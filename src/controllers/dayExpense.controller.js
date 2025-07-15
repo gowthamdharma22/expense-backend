@@ -14,7 +14,7 @@ const createDayExpense = async (req, res) => {
     if (!day) {
       return sendError(res, { message: "Day not found" }, "Invalid Day", 404);
     }
-    if (!isAdmin && (!day.ignoreFrozenCheck && day.isFrozen)) {
+    if (!isAdmin && !day.ignoreFrozenCheck && day.isFrozen) {
       return sendError(
         res,
         { message: "Day is frozen" },
@@ -201,7 +201,7 @@ const updateDayExpense = async (req, res) => {
       );
     }
 
-    if ("isVerified" in req.body && req.user?.role !== "admin") {
+    if (!isAdmin && "isVerified" in req.body) {
       return sendError(
         res,
         { message: "Unauthorized" },
@@ -231,7 +231,11 @@ const updateDayExpense = async (req, res) => {
       }
     }
 
-    const updated = await DayExpenseService.updateDayExpense(id, req.body);
+    const updated = await DayExpenseService.updateDayExpense(
+      id,
+      req.body,
+      isAdmin
+    );
 
     Activity.Logger(
       { email: req.user?.email, role: req.user?.role },
@@ -255,7 +259,9 @@ const updateDayExpense = async (req, res) => {
 const deleteDayExpense = async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await DayExpenseService.deleteDayExpense(id);
+    const isAdmin = req.user?.role === "admin";
+
+    const deleted = await DayExpenseService.deleteDayExpense(id, isAdmin);
     if (!deleted) {
       return sendError(
         res,

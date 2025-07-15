@@ -428,7 +428,7 @@ export const createDayExpense = async (data) => {
   }
 };
 
-export const updateDayExpense = async (id, data) => {
+export const updateDayExpense = async (id, data, isAdmin) => {
   try {
     const existing = await DayExpense.findOne({ id });
     if (!existing) {
@@ -437,7 +437,7 @@ export const updateDayExpense = async (id, data) => {
       throw error;
     }
 
-    if (existing.isVerified) {
+    if (!isAdmin && existing.isVerified) {
       const error = new Error("Verified day expense cannot be edited");
       error.status = 403;
       throw error;
@@ -511,7 +511,7 @@ export const verifyDayExpense = async (id, status) => {
   }
 };
 
-export const deleteDayExpense = async (id) => {
+export const deleteDayExpense = async (id, isAdmin) => {
   try {
     const existing = await DayExpense.findOne({ id });
     if (!existing) {
@@ -520,7 +520,7 @@ export const deleteDayExpense = async (id) => {
       throw error;
     }
 
-    if (existing.isVerified) {
+    if (!isAdmin && existing.isVerified) {
       const error = new Error("Verified day expense cannot be deleted");
       error.status = 403;
       throw error;
