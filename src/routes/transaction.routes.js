@@ -4,15 +4,11 @@ import { admin } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/adjust", admin, transactionController.adjustTransaction);
+router.post("/adjust", transactionController.adjustTransaction);
 router.get(
   "/notes/:shopId",
   transactionController.getTransactionRecordsByShopId
 );
-router.patch(
-  "/verify/:id",
-  admin,
-  transactionController.verifyAdjustment
-);
+router.patch("/verify/:id", admin, transactionController.verifyAdjustment);
 
 export default router;
