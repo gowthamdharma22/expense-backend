@@ -4,12 +4,21 @@ import mongooseSequence from "mongoose-sequence";
 const { Schema } = mongoose;
 const autoIncrement = mongooseSequence(mongoose);
 
-const wholesaleTransactionSchema = new Schema(
+const transactionSchema = new Schema(
   {
     id: { type: Number, unique: true },
     shopId: { type: Number, required: true, ref: "Shop" },
+    shopType: {
+      type: String,
+      enum: ["retail", "wholesale"],
+      required: true,
+    },
     amount: { type: Number, required: true },
-    type: { type: String, enum: ["credit", "debit", "adjust"], required: true },
+    type: {
+      type: String,
+      enum: ["credit", "debit", "adjust"],
+      required: true,
+    },
     description: { type: String },
     dayExpenseId: { type: Number, ref: "DayExpense", default: 0 },
     userId: { type: Number, ref: "CreditDebitUser" },
@@ -18,13 +27,10 @@ const wholesaleTransactionSchema = new Schema(
   { timestamps: true }
 );
 
-wholesaleTransactionSchema.plugin(autoIncrement, {
+transactionSchema.plugin(autoIncrement, {
   inc_field: "id",
-  id: "wholesale_id_counter",
+  id: "transaction_id_counter",
   start_seq: 1,
 });
 
-export default mongoose.model(
-  "WholesaleTransaction",
-  wholesaleTransactionSchema
-);
+export default mongoose.model("Transaction", transactionSchema);

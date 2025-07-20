@@ -1,5 +1,4 @@
-import WholesaleTransaction from "../models/WholeSaleTransaction.js";
-import RetailTransaction from "../models/RetailTransaction.js";
+import Transaction from "../models/Transaction.js";
 import CreditDebitUser from "../models/CreditDebitUser.js";
 import logger from "../utils/logger.js";
 import Shop from "../models/Shop.js";
@@ -25,17 +24,14 @@ export const recordTransaction = async ({
       type,
       description,
       dayExpenseId,
+      shopType,
     };
 
     if (userId) {
       data.userId = userId;
     }
 
-    if (shopType === "wholesale") {
-      return await WholesaleTransaction.create(data);
-    } else {
-      return await RetailTransaction.create(data);
-    }
+    return await Transaction.create(data);
   } catch (err) {
     logger.error(
       `[transaction.service.js] [recordTransaction] - ${err.message}`
@@ -53,9 +49,6 @@ export const getMonthlyTransactionSummary = async (
     const shop = await Shop.findOne({ id: shopId }).lean();
     if (!shop) throw new Error("Shop not found");
 
-    const Model =
-      shop.shopType === "wholesale" ? WholesaleTransaction : RetailTransaction;
-
     const baseQuery = { shopId };
 
     if (monthStr) {
@@ -69,7 +62,7 @@ export const getMonthlyTransactionSummary = async (
       };
     }
 
-    const transactions = await Model.find(baseQuery).lean();
+    const transactions = await Transaction.find(baseQuery).lean();
     if (!transactions.length)
       return { summary: [], totalAmount: 0, adjustments: [] };
 
@@ -187,9 +180,7 @@ export const getMonthlyTransactionSummary = async (
 };
 
 export const verifyAdjustment = async (id, isAdjustmentVerified) => {
-  const txn =
-    (await RetailTransaction.findOne({ id })) ||
-    (await WholesaleTransaction.findOne({ id }));
+  const txn = await Transaction.findOne({ id }).lean();
 
   if (!txn) throw new Error("Transaction not found");
 

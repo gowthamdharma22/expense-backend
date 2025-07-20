@@ -9,8 +9,7 @@ import * as DayService from "./day.service.js";
 import Shop from "../models/Shop.js";
 import dayjs from "dayjs";
 import CreditDebitUser from "../models/CreditDebitUser.js";
-import WholeSaleTransaction from "../models/WholeSaleTransaction.js";
-import RetailTransaction from "../models/RetailTransaction.js";
+import Transaction from "../models/Transaction.js";
 
 export const getAllDayExpenses = async () => {
   try {
@@ -155,9 +154,6 @@ export const getDayExpenseForMonth = async (monthStr, shopId) => {
     const allowedEditDays = shop.allowedEditDays || 0;
     const today = dayjs().startOf("day");
 
-    const TransactionModel =
-      shop.shopType === "wholesale" ? WholeSaleTransaction : RetailTransaction;
-
     const days = await Days.find({
       shopId,
       date: { $gte: start, $lte: end },
@@ -197,8 +193,10 @@ export const getDayExpenseForMonth = async (monthStr, shopId) => {
             let user = null;
 
             if ([1, 2].includes(d.expenseId)) {
-              const txn = await TransactionModel.findOne({
+              const txn = await Transaction.findOne({
                 dayExpenseId: d.id,
+                shopId: shopId,
+                shopType: shop.shopType,
               }).lean();
 
               if (txn?.userId) {
@@ -366,6 +364,7 @@ export const getMonthlyExpenseDetails = async (shopId, expenseId, monthStr) => {
       type: expenseDetail.type,
       amount: exp.amount,
       description: exp.description || "",
+      isVerified: exp.isVerified || false,
     }));
 
     summary.sort((a, b) => (dayjs(a.date).isBefore(dayjs(b.date)) ? -1 : 1));
@@ -460,12 +459,7 @@ export const updateDayExpense = async (id, data, isAdmin) => {
       if (day) {
         const shop = await Shop.findOne({ id: day.shopId });
         if (shop) {
-          const TransactionModel =
-            shop.shopType === "wholesale"
-              ? WholeSaleTransaction
-              : RetailTransaction;
-
-          await TransactionModel.updateOne(
+          await Transaction.updateOne(
             { dayExpenseId },
             { userId: data.userId }
           );
