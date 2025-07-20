@@ -4,12 +4,12 @@ import logger from "../utils/logger.js";
 import Shop from "../models/Shop.js";
 import Days from "../models/Day.js";
 import DayExpenses from "../models/DayExpenses.js";
-import WholeSaleTransaction from "../models/WholeSaleTransaction.js";
-import RetailTransaction from "../models/RetailTransaction.js";
 import * as DayExpenseService from "./dayExpense.service.js";
 import TemplateExpenseBridge from "../models/TemplateExpenseBridge.js";
 import Expense from "../models/Expense.js";
 import CreditDebitUser from "../models/CreditDebitUser.js";
+import Transaction from "../models/Transaction.js";
+
 dayjs.extend(utc);
 
 const getAllDays = async (shopId) => {
@@ -184,6 +184,7 @@ const getMonthlyExpenseSummary = async (shopId, monthStr) => {
     if (!allExpenses.length) return [];
 
     const summaryMap = new Map();
+    const verificationMap = new Map();
 
     for (const exp of allExpenses) {
       if (!exp.expenseId || !exp.amount || exp.amount <= 0) continue;
@@ -198,6 +199,11 @@ const getMonthlyExpenseSummary = async (shopId, monthStr) => {
       const current = summaryMap.get(exp.expenseId);
       current.totalAmount += exp.amount;
       current.usedDays.add(exp.dayId);
+
+      if (!verificationMap.has(exp.expenseId)) {
+        verificationMap.set(exp.expenseId, []);
+      }
+      verificationMap.get(exp.expenseId).push(exp.isVerified === true);
     }
 
     const expenseIds = [...summaryMap.keys()];
@@ -209,6 +215,9 @@ const getMonthlyExpenseSummary = async (shopId, monthStr) => {
 
     for (const exp of expenseDetails) {
       const summary = summaryMap.get(exp.id);
+      const verifications = verificationMap.get(exp.id) || [];
+      const isVerified =
+        verifications.length > 0 && verifications.every((v) => v);
 
       const enriched = {
         expenseId: exp.id,
@@ -217,16 +226,15 @@ const getMonthlyExpenseSummary = async (shopId, monthStr) => {
         totalAmount: summary.totalAmount,
         daysUsed: summary.usedDays.size,
         isDefault: exp.isDefault || false,
+        isVerified,
       };
 
       if (["credit", "debit"].includes(exp.type) && [1, 2].includes(exp.id)) {
-        const TransactionModel =
-          (await Shop.findOne({ id: shopId }).lean()).shopType === "wholesale"
-            ? WholeSaleTransaction
-            : RetailTransaction;
+        const shopData = await Shop.findOne({ id: shopId }).lean();
 
-        const transactions = await TransactionModel.find({
+        const transactions = await Transaction.find({
           shopId,
+          shopType: shopData.shopType,
           type: exp.type,
           createdAt: { $gte: start, $lte: end },
           userId: { $ne: null },
@@ -392,15 +400,6 @@ const deleteDayByDate = async (dateStr, shopId) => {
 
     const dayExpenses = await DayExpenses.find({
       dayId: { $in: dayIds },
-    });
-
-    const dayExpenseIds = dayExpenses.map((d) => d.id);
-
-    const transactionModel =
-      shop.shopType === "wholesale" ? WholeSaleTransaction : RetailTransaction;
-
-    await transactionModel.deleteMany({
-      dayExpenseId: { $in: dayExpenseIds },
     });
 
     await DayExpenses.deleteMany({ dayId: { $in: dayIds } });

@@ -2,7 +2,6 @@ import logger from "../utils/logger.js";
 import { sendSuccess, sendError } from "../utils/responseHandler.js";
 import * as shopService from "../services/shop.service.js";
 import * as Activity from "../services/activity.service.js";
-import mongoose from "mongoose";
 
 const VALID_SHOP_TYPES = ["wholesale", "retail"];
 
